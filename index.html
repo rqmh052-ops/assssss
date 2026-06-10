@@ -1626,7 +1626,7 @@
     const target = new URL(mod.page, window.location.href).href;
     hideModeStart();
     closeModes();
-    window.location.href = target;
+    openModWrapper(mod, target);
   }
 
   function confirmModeStart() {
@@ -6322,6 +6322,654 @@ _buildDoor(x, z) {
     document.getElementById('settings-overlay').classList.add('hidden');
 
   })(); // end ONLINE SYSTEM
+})();
+</script>
+
+<!-- ============================================================ -->
+<!--  MOD WRAPPER — شريط التحكم + iframe لكل المودات            -->
+<!-- ============================================================ -->
+<div id="mod-wrapper">
+
+  <!-- شاشة التحميل -->
+  <div id="mod-loading-screen">
+    <div id="mod-loading-content">
+      <div id="mod-loading-flicker"></div>
+      <div id="mod-loading-title"></div>
+      <div id="mod-loading-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <div id="mod-loading-sub">جاري تحميل المود...</div>
+    </div>
+  </div>
+
+  <!-- شريط التحكم العلوي -->
+  <div id="mod-topbar">
+    <!-- زر الرجوع -->
+    <button id="mod-back-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      رجوع
+    </button>
+
+    <!-- اسم المود -->
+    <div id="mod-topbar-name"></div>
+
+    <!-- أدوات اليمين -->
+    <div id="mod-topbar-tools">
+
+      <!-- عداد FPS -->
+      <div class="mod-pill" id="mod-fps-pill">FPS: –</div>
+
+      <!-- جودة الجرافيك -->
+      <div class="mod-pill mod-pill-btn" id="mod-quality-pill" role="button" tabindex="0">
+        <span id="mod-quality-label">Medium</span>
+        <div id="mod-quality-menu">
+          <div class="mod-qmenu-title">جودة الجرافيك</div>
+          <div class="mod-qmenu-item" data-tier="low">
+            <div class="mod-qitem-dot low"></div>
+            <div><div class="mod-qitem-name">Low</div><div class="mod-qitem-desc">256px · أجهزة ضعيفة</div></div>
+          </div>
+          <div class="mod-qmenu-item" data-tier="medium">
+            <div class="mod-qitem-dot medium"></div>
+            <div><div class="mod-qitem-name">Medium</div><div class="mod-qitem-desc">512px · موبايل عادي</div></div>
+          </div>
+          <div class="mod-qmenu-item" data-tier="high">
+            <div class="mod-qitem-dot high"></div>
+            <div><div class="mod-qitem-name">High</div><div class="mod-qitem-desc">1024px · PC / موبايل قوي</div></div>
+          </div>
+          <div class="mod-qmenu-item" data-tier="ultra">
+            <div class="mod-qitem-dot ultra"></div>
+            <div><div class="mod-qitem-name">Ultra</div><div class="mod-qitem-desc">2048px · GPU قوية</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- الإعدادات -->
+      <button class="mod-pill mod-pill-btn" id="mod-settings-btn">
+        الإعدادات
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+
+    </div><!-- /mod-topbar-tools -->
+  </div><!-- /mod-topbar -->
+
+  <!-- iframe المود -->
+  <iframe id="mod-iframe" allowfullscreen></iframe>
+
+  <!-- overlay الإعدادات فوق الـ iframe -->
+  <div id="mod-settings-overlay" class="mod-overlay mod-overlay-hidden">
+    <div class="mod-settings-card">
+      <h2>⚙ إعدادات المود</h2>
+      <div class="mod-setting-row">
+        <label>المؤثرات الصوتية</label>
+        <input type="checkbox" id="mod-sound-toggle" checked>
+      </div>
+      <div class="mod-setting-row">
+        <label>الموسيقى</label>
+        <input type="checkbox" id="mod-music-toggle" checked>
+      </div>
+      <button class="mod-close-btn" id="mod-settings-close">← إغلاق الإعدادات</button>
+      <button class="mod-back-lobby-btn" id="mod-settings-back">⬅ العودة للقائمة الرئيسية</button>
+    </div>
+  </div>
+
+</div><!-- /#mod-wrapper -->
+
+<style>
+/* ============================================================ */
+/*  MOD WRAPPER STYLES                                           */
+/* ============================================================ */
+
+#mod-wrapper {
+  position: fixed;
+  inset: 0;
+  z-index: 99000;
+  display: none;
+  flex-direction: column;
+  background: #0a0a0a;
+  font-family: 'Cairo', system-ui, sans-serif;
+  direction: rtl;
+}
+#mod-wrapper.mod-active {
+  display: flex;
+}
+
+/* ---- شاشة التحميل ---- */
+#mod-loading-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: radial-gradient(ellipse at center, #1a0000 0%, #000 75%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease;
+}
+#mod-loading-screen.mod-loading-done {
+  opacity: 0;
+  pointer-events: none;
+}
+#mod-loading-content {
+  text-align: center;
+  direction: rtl;
+}
+#mod-loading-flicker {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #8b0000 0%, #3a0000 60%, transparent 100%);
+  box-shadow: 0 0 30px rgba(139,0,0,0.8), 0 0 70px rgba(139,0,0,0.3);
+  animation: mod-flicker 0.9s ease-in-out infinite alternate;
+}
+@keyframes mod-flicker {
+  0%   { opacity: 0.6; transform: scale(0.92); box-shadow: 0 0 20px rgba(139,0,0,0.5); }
+  100% { opacity: 1;   transform: scale(1.05); box-shadow: 0 0 50px rgba(139,0,0,0.9), 0 0 90px rgba(139,0,0,0.4); }
+}
+#mod-loading-title {
+  font-size: clamp(18px, 4vw, 28px);
+  font-weight: 900;
+  color: #edd56a;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  text-shadow: 0 0 20px rgba(237,213,106,0.5);
+}
+#mod-loading-sub {
+  font-size: 12px;
+  color: rgba(196,207,190,0.6);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+#mod-loading-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+#mod-loading-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8b0000;
+  animation: mod-dot-bounce 1.2s ease-in-out infinite;
+}
+#mod-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+#mod-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes mod-dot-bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+  40%           { transform: scale(1.2); opacity: 1; background: #edd56a; }
+}
+
+/* ---- شريط التحكم ---- */
+#mod-topbar {
+  height: 42px;
+  min-height: 42px;
+  background: rgba(10, 13, 10, 0.97);
+  border-bottom: 1px solid rgba(237,213,106,0.18);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 8px;
+  flex-shrink: 0;
+  direction: rtl;
+  z-index: 5;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+
+#mod-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(139,0,0,0.25);
+  border: 1px solid rgba(139,0,0,0.5);
+  color: #ff8080;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+  direction: rtl;
+}
+#mod-back-btn:hover { background: rgba(139,0,0,0.45); box-shadow: 0 0 12px rgba(139,0,0,0.4); }
+#mod-back-btn:active { transform: scale(0.96); }
+
+#mod-topbar-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(237,213,106,0.7);
+  text-align: center;
+  letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#mod-topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  direction: ltr;
+}
+
+/* ---- الـ pills ---- */
+.mod-pill {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(13,17,16,0.92);
+  color: #eef2f6;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.mod-pill-btn {
+  cursor: pointer;
+  border: none;
+  transition: background 0.12s;
+}
+.mod-pill-btn:hover { background: rgba(30,40,28,0.97); box-shadow: 0 0 0 1px rgba(237,213,106,0.3); }
+.mod-pill-btn:active { transform: scale(0.97); }
+
+#mod-fps-pill { color: #eef2f6; min-width: 62px; }
+#mod-quality-pill { color: #edd56a; min-width: 64px; position: relative; }
+#mod-quality-pill::after {
+  content: '';
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid #edd56a;
+  margin-left: 4px;
+  transition: transform 0.2s;
+}
+#mod-quality-pill.open::after { transform: rotate(180deg); }
+
+#mod-settings-btn { color: #eef2f6; gap: 5px; border: 1px solid rgba(255,255,255,0.10); }
+
+/* ---- قائمة الجودة ---- */
+#mod-quality-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: rgba(10,14,10,0.97);
+  border: 1px solid rgba(237,213,106,0.30);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  backdrop-filter: blur(10px);
+  direction: rtl;
+  animation: mod-qmenu-in 0.15s ease;
+}
+#mod-quality-menu.open { display: flex; }
+@keyframes mod-qmenu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.mod-qmenu-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(237,213,106,0.5);
+  text-align: center;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 4px 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 2px;
+}
+.mod-qmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  direction: rtl;
+}
+.mod-qmenu-item:hover { background: rgba(237,213,106,0.08); border-color: rgba(237,213,106,0.18); }
+.mod-qmenu-item.active { background: rgba(237,213,106,0.13); border-color: rgba(237,213,106,0.4); }
+.mod-qmenu-item.active .mod-qitem-name { color: #edd56a; }
+.mod-qitem-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 5px currentColor;
+}
+.mod-qitem-dot.low    { background: #ff4444; color: #ff4444; }
+.mod-qitem-dot.medium { background: #ffaa00; color: #ffaa00; }
+.mod-qitem-dot.high   { background: #44ccff; color: #44ccff; }
+.mod-qitem-dot.ultra  { background: #aa44ff; color: #aa44ff; }
+.mod-qitem-name { font-size: 12px; font-weight: 700; color: #eef2f6; }
+.mod-qitem-desc { font-size: 9px; color: rgba(196,207,190,0.55); direction: ltr; }
+
+/* ---- الـ iframe ---- */
+#mod-iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  display: block;
+  background: #000;
+}
+
+/* ---- overlay الإعدادات ---- */
+.mod-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0,0,0,0.7);
+  z-index: 50;
+  transition: opacity 0.2s;
+  backdrop-filter: blur(4px);
+}
+.mod-overlay-hidden { opacity: 0; pointer-events: none; }
+
+.mod-settings-card {
+  padding: 20px;
+  border-radius: 16px;
+  background: rgba(15,18,15,0.97);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+  width: min(320px, calc(100vw - 24px));
+  text-align: right;
+  direction: rtl;
+  font-family: inherit;
+}
+.mod-settings-card h2 {
+  margin: 0 0 16px 0;
+  color: #edd56a;
+  text-align: center;
+  font-size: 16px;
+}
+.mod-setting-row {
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #eef2f6;
+}
+.mod-setting-row input[type="checkbox"] {
+  accent-color: #edd56a;
+  width: 18px; height: 18px;
+  cursor: pointer;
+}
+.mod-close-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  background: #eef2f6;
+  color: #000;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  margin-top: 6px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.mod-close-btn:hover { background: #fff; }
+.mod-back-lobby-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(139,0,0,0.3);
+  color: #ff8080;
+  font-weight: 700;
+  border: 1px solid rgba(139,0,0,0.5);
+  cursor: pointer;
+  margin-top: 8px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.mod-back-lobby-btn:hover { background: rgba(139,0,0,0.5); }
+
+/* ---- موبايل ---- */
+@media (max-width: 480px) {
+  #mod-topbar { height: 38px; min-height: 38px; padding: 0 7px; gap: 5px; }
+  #mod-back-btn { height: 24px; padding: 0 9px; font-size: 10px; }
+  .mod-pill { height: 24px; font-size: 10px; padding: 0 7px; }
+  #mod-topbar-name { font-size: 10px; }
+}
+</style>
+
+<script>
+/* ============================================================ */
+/*  MOD WRAPPER SYSTEM                                           */
+/* ============================================================ */
+(function() {
+
+  const wrapper       = document.getElementById('mod-wrapper');
+  const loadingScreen = document.getElementById('mod-loading-screen');
+  const loadingTitle  = document.getElementById('mod-loading-title');
+  const topbarName    = document.getElementById('mod-topbar-name');
+  const iframe        = document.getElementById('mod-iframe');
+  const backBtn       = document.getElementById('mod-back-btn');
+  const fpsPill       = document.getElementById('mod-fps-pill');
+
+  // Quality
+  const qualityPill   = document.getElementById('mod-quality-pill');
+  const qualityLabel  = document.getElementById('mod-quality-label');
+  const qualityMenu   = document.getElementById('mod-quality-menu');
+  const qualityItems  = qualityMenu.querySelectorAll('.mod-qmenu-item');
+
+  // Settings
+  const settingsBtn     = document.getElementById('mod-settings-btn');
+  const settingsOverlay = document.getElementById('mod-settings-overlay');
+  const settingsClose   = document.getElementById('mod-settings-close');
+  const settingsBack    = document.getElementById('mod-settings-back');
+
+  // ---- حالة الجودة المحفوظة ----
+  const QUALITY_LABELS = { low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
+  let currentQuality = 'medium';
+  let qualityMenuOpen = false;
+
+  // مزامنة اختيار الجودة مع اللعبة الأساسية إن وجدت
+  function detectInitialQuality() {
+    try {
+      const mainLabel = document.getElementById('quality-label');
+      if (mainLabel) {
+        const t = mainLabel.textContent.toLowerCase();
+        if (QUALITY_LABELS[t]) { currentQuality = t; return; }
+      }
+    } catch(e) {}
+    currentQuality = 'medium';
+  }
+
+  function syncQualityUI(tier) {
+    qualityLabel.textContent = QUALITY_LABELS[tier] || tier;
+    qualityItems.forEach(el => el.classList.toggle('active', el.dataset.tier === tier));
+  }
+
+  function openQualityMenu(e) {
+    e.stopPropagation();
+    qualityMenuOpen = !qualityMenuOpen;
+    qualityMenu.classList.toggle('open', qualityMenuOpen);
+    qualityPill.classList.toggle('open', qualityMenuOpen);
+  }
+  function closeQualityMenu() {
+    qualityMenuOpen = false;
+    qualityMenu.classList.remove('open');
+    qualityPill.classList.remove('open');
+  }
+
+  qualityPill.addEventListener('click', openQualityMenu);
+  qualityPill.addEventListener('touchend', e => { e.preventDefault(); openQualityMenu(e); }, { passive: false });
+  document.addEventListener('click', e => { if (qualityMenuOpen && !qualityPill.contains(e.target)) closeQualityMenu(); });
+
+  qualityItems.forEach(el => {
+    const pick = (e) => {
+      e.stopPropagation(); e.preventDefault();
+      currentQuality = el.dataset.tier;
+      syncQualityUI(currentQuality);
+      closeQualityMenu();
+      // أرسل الجودة المختارة للـ iframe
+      try {
+        iframe.contentWindow.postMessage({ type: 'MOD_QUALITY', tier: currentQuality }, '*');
+      } catch(err) {}
+    };
+    el.addEventListener('click', pick);
+    el.addEventListener('touchend', pick, { passive: false });
+  });
+
+  // ---- FPS counter (يعتمد على رسائل من الـ iframe أو يُحسب داخلياً) ----
+  let fpsCount = 0;
+  let fpsLast  = performance.now();
+  let fpsRaf   = null;
+
+  function startFpsCounter() {
+    fpsCount = 0; fpsLast = performance.now();
+    function tick() {
+      fpsCount++;
+      const now = performance.now();
+      if (now - fpsLast >= 1000) {
+        fpsPill.textContent = 'FPS: ' + fpsCount;
+        fpsCount = 0;
+        fpsLast = now;
+      }
+      fpsRaf = requestAnimationFrame(tick);
+    }
+    fpsRaf = requestAnimationFrame(tick);
+  }
+  function stopFpsCounter() {
+    if (fpsRaf) { cancelAnimationFrame(fpsRaf); fpsRaf = null; }
+    fpsPill.textContent = 'FPS: –';
+  }
+
+  // ---- إعدادات overlay ----
+  function openSettings() {
+    settingsOverlay.classList.remove('mod-overlay-hidden');
+  }
+  function closeSettings() {
+    settingsOverlay.classList.add('mod-overlay-hidden');
+  }
+  settingsBtn.addEventListener('click', openSettings);
+  settingsBtn.addEventListener('touchend', e => { e.preventDefault(); openSettings(); }, { passive: false });
+  settingsClose.addEventListener('click', closeSettings);
+  settingsClose.addEventListener('touchend', e => { e.preventDefault(); closeSettings(); }, { passive: false });
+
+  settingsBack.addEventListener('click', closeModWrapper);
+  settingsBack.addEventListener('touchend', e => { e.preventDefault(); closeModWrapper(); }, { passive: false });
+
+  // إعدادات الصوت/موسيقى — ترسل رسائل للـ iframe
+  document.getElementById('mod-sound-toggle').addEventListener('change', e => {
+    try { iframe.contentWindow.postMessage({ type: 'MOD_SOUND', enabled: e.target.checked }, '*'); } catch(err) {}
+  });
+  document.getElementById('mod-music-toggle').addEventListener('change', e => {
+    try { iframe.contentWindow.postMessage({ type: 'MOD_MUSIC', enabled: e.target.checked }, '*'); } catch(err) {}
+  });
+
+  // ---- فتح المود ----
+  window.openModWrapper = function(mod, url) {
+    detectInitialQuality();
+    syncQualityUI(currentQuality);
+
+    // اسم المود في الشريط وشاشة التحميل
+    const modName = mod.name || 'مود';
+    topbarName.textContent   = modName;
+    loadingTitle.textContent = modName;
+
+    // أوقف اللعبة الأساسية (Three.js + lobby renderer)
+    try {
+      if (window._stopLobbyRenderer) window._stopLobbyRenderer();
+    } catch(e) {}
+
+    // أخفِ lobby
+    try {
+      const lobbyEl = document.getElementById('lobby-screen');
+      if (lobbyEl) { lobbyEl.classList.add('hiding'); setTimeout(() => lobbyEl.classList.add('hidden'), 600); }
+      const gameWrap = document.getElementById('game-wrapper');
+      if (gameWrap) gameWrap.classList.remove('visible');
+    } catch(e) {}
+
+    // أظهر الغلاف مع شاشة التحميل
+    wrapper.classList.add('mod-active');
+    loadingScreen.classList.remove('mod-loading-done');
+    settingsOverlay.classList.add('mod-overlay-hidden');
+    closeQualityMenu();
+
+    // أفرغ الـ iframe أولاً
+    iframe.src = 'about:blank';
+
+    // بعد 1.8 ثانية (شاشة رعب التحميل) حمّل المود
+    setTimeout(() => {
+      iframe.src = url;
+    }, 1800);
+
+    // عندما يحمّل الـ iframe أخفِ شاشة التحميل
+    iframe.onload = function() {
+      if (iframe.src === 'about:blank') return;
+      loadingScreen.classList.add('mod-loading-done');
+      startFpsCounter();
+    };
+  };
+
+  // ---- إغلاق المود والعودة للقائمة ----
+  function closeModWrapper() {
+    stopFpsCounter();
+    closeSettings();
+    closeQualityMenu();
+
+    // أوقف الـ iframe
+    iframe.src = 'about:blank';
+
+    // أخفِ الغلاف
+    wrapper.classList.remove('mod-active');
+
+    // أعد القائمة الرئيسية
+    try {
+      const lobbyEl = document.getElementById('lobby-screen');
+      if (lobbyEl) {
+        lobbyEl.classList.remove('hidden', 'hiding');
+        lobbyEl.style.animation = '';
+        lobbyEl.style.opacity   = '1';
+      }
+      const settingsOv = document.getElementById('settings-overlay');
+      if (settingsOv) settingsOv.classList.add('hidden');
+      const winOv = document.getElementById('win-overlay');
+      if (winOv) winOv.style.display = 'none';
+      const mm = document.getElementById('main-menu');
+      if (mm) mm.style.display = 'none';
+      const om = document.getElementById('online-menu');
+      if (om) om.classList.remove('visible');
+    } catch(e) {}
+  }
+
+  backBtn.addEventListener('click', closeModWrapper);
+  backBtn.addEventListener('touchend', e => { e.preventDefault(); closeModWrapper(); }, { passive: false });
+
+  // مفتاح Escape يغلق الإعدادات أولاً، ثم المود
+  document.addEventListener('keydown', e => {
+    if (!wrapper.classList.contains('mod-active')) return;
+    if (e.key === 'Escape') {
+      if (!settingsOverlay.classList.contains('mod-overlay-hidden')) {
+        closeSettings();
+      }
+    }
+  });
+
 })();
 </script>
 
