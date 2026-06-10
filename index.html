@@ -3299,7 +3299,7 @@ _placeKeys() {
     bookGroup.add(cover, pages, spine);
     if (glow) { glow.position.y = 0.45; bookGroup.add(glow); }
 
-    bookGroup.position.set(px, 0, pz);
+    bookGroup.position.set(px, 0.75, pz); // ★ 0.75m عن الأرض — على مستوى اليد
     bookGroup.userData = { isBook: true, bookIndex: i, collected: false, worldPos: { x: px, z: pz } };
     this.keyObjects.push(bookGroup);
     this.scene.add(bookGroup);
@@ -3880,6 +3880,7 @@ _buildDoor(x, z) {
 
       if (this.hasWeapon && (this.firePressed || this.keys['KeyF']) && time - this.lastShotTime > 78) {
         this.lastShotTime = time;
+        this.justFired    = true; // ★ لـ checkShotHit
         this.recoil = 0.22;
         this.weaponKick = 0.035;
         this.flashLight.intensity = 3.5;
@@ -4238,65 +4239,53 @@ _buildDoor(x, z) {
   // ============================================================
   //  SLENDRINA SYSTEM
   //  وضعان رعب:
-  //  MODE_FACE  — تظهر قريبة جداً وتثبتك، تنظر لها 3 ثواني = قلب
-  //  MODE_WATCH — تظهر من بعيد وعيونها حمراء، تراقبك فقط
-  //  لا تجري — الجري مهمة ابنها العنكبوت
+  //  MODE_FACE — تظهر قريبة جداً (3-6 خلايا) وتثبتك
+  //  تنظر لها 3 ثواني = قلب — لا MODE_WATCH
   // ============================================================
   class EnemySystem {
-    static get MODE_FACE()  { return 1; }
-    static get MODE_WATCH() { return 2; }
+    static get MODE_FACE() { return 1; }
 
     constructor(scene, maze, camera) {
       this.scene  = scene;
       this.maze   = maze;
       this.camera = camera;
 
-      this.ENEMY_RADIUS  = 0.4;
-      this.FACE_DIST     = 1.2;
-      // 3 ثواني — واقعي بناءً على ألعاب DVloper الأصلية (Hard ~1.5s, Easy ~5s)
-      this.STARE_KILL    = 3.0;
-      this.COOLDOWN_MIN  = 10.0;
-      this.COOLDOWN_MAX  = 22.0;
-      this._isCatching   = false;
+      this.ENEMY_RADIUS = 0.4;
+      this.FACE_DIST    = 1.5;   // تتوقف على بعد 1.5m منك
+      this.STARE_KILL   = 3.0;   // 3 ثواني نظر = قلب
+      this.MOVE_SPEED   = 1.8;   // تمشي ببطء نحوك مع collision
+      this.COOLDOWN_MIN = 8.0;
+      this.COOLDOWN_MAX = 18.0;
+      this._isCatching  = false;
 
-      // مجموعة المجسم
       this.group = new THREE.Group();
       this.group.visible = false;
       this.scene.add(this.group);
 
-      // ── تحميل GLB أو بناء fallback ──
       this._modelReady = false;
       this._loadModel();
 
-      // ── بناء الـ grid للـ BFS ──
-      this._buildGrid();
+      this._buildGrid(); // للبقاء متوافقاً مع refreshGridForDoor
 
-      // ── حالة داخلية ──
-      this._mode        = 0;          // 0 = مختفية
-      this._stareTimer  = 0;          // وقت النظر في FACE
-      this._chaseTimer  = 0;          // وقت المطاردة المتبقي
-      this._cooldown    = rand(8, 16);// أول ظهور
+      this._mode       = 0;
+      this._stareTimer = 0;
+      this._chaseTimer = 0;
+      this._cooldown   = rand(6, 12);
       this._currentPath = null;
       this._pathTimer   = 0;
       this._pathStep    = 1;
 
-      // ── تأثيرات الشاشة ──
       this._buildScreenFX();
 
-      // ══════════════════════════════════════════════
-      //  CAMERA AUTO-SNAP SYSTEM
-      //  عند ظهور سليندرينا — الكاميرا تنقلب نحوها
-      // ══════════════════════════════════════════════
       this._snap = {
-        active:      false,   // هل النظام نشط الآن
-        targetYaw:   0,       // الزاوية المستهدفة (yaw)
-        targetPitch: 0,       // pitch مستهدف
-        duration:    0.55,    // مدة الانقلاب بالثواني
-        elapsed:     0,       // الوقت المنقضي
-        startYaw:    0,       // yaw اللحظة الانطلاق
-        startPitch:  0,
-        eased:       false,   // هل اكتمل
+        active: false, targetYaw: 0, targetPitch: 0,
+        duration: 0.5, elapsed: 0, startYaw: 0, startPitch: 0, eased: false,
       };
+
+      // غضب سليندرينا عند قتل العنكبوت
+      this._rageActive  = false;
+      this._rageTimer   = 0;
+      this._rageBursts  = 0;
     }
 
     // ═══════════════════════════════════════════════
@@ -4498,96 +4487,49 @@ _buildDoor(x, z) {
     //  تفعيل وضع جديد
     // ═══════════════════════════════════════════════
     _activateMode(mode, playerRef) {
-      this._mode = mode;
+      this._mode       = EnemySystem.MODE_FACE;
       this._stareTimer = 0;
       this._chaseTimer = 0;
       this.group.visible = true;
       this._doJumpScare();
 
-      if (this._eyeL) {
-        this._eyeL.visible = (mode === EnemySystem.MODE_WATCH);
-        this._eyeR.visible = (mode === EnemySystem.MODE_WATCH);
-      }
-      if (this._slendModel) {
-        this._slendModel.traverse(child => {
-          if (child.isMesh && child.name.toLowerCase().includes('eye')) {
-            child.material = child.material.clone();
-            if (mode === EnemySystem.MODE_WATCH) {
-              child.material.color.set('#ff0000');
-              child.material.emissive.set('#ff0000');
-              child.material.emissiveIntensity = 3.0;
-            } else {
-              child.material.emissiveIntensity = 0.7;
-            }
-          }
-        });
-      }
+      // ★ دائماً قريبة — 3 إلى 6 خلايا فقط
+      // كلما جمعت كتباً أكثر تقترب أكثر
+      const ratio   = clamp(GameState.keysCollected / GameState.totalKeys, 0, 1);
+      const minD    = Math.round(lerp(5, 3, ratio));   // 5→3 خلايا
+      const maxD    = Math.round(lerp(8, 5, ratio));   // 8→5 خلايا
+      const cs      = this.maze.cellSize;
+      const camR    = Math.round(this.camera.position.z / cs);
+      const camC    = Math.round(this.camera.position.x / cs);
 
-      if (mode === EnemySystem.MODE_FACE) {
-        // ★ تظهر دائماً خلف اللاعب مباشرة (من الخلف = أكثر إرعاباً)
-        // كلما جمعت كتباً أكثر — تظهر أقرب وأقرب
-        const ratio = clamp(GameState.keysCollected / GameState.totalKeys, 0, 1);
-        const minDist = lerp(14, 5, ratio);  // أول ظهور 14 خلية — آخر ظهور 5 خلايا
-        const maxDist = lerp(22, 10, ratio);
+      const candidates = NavGraph.reachableList.filter(cell => {
+        const d = Math.hypot(cell.r - camR, cell.c - camC);
+        return d >= minD && d <= maxD &&
+               mapLayout[cell.r]?.[cell.c] !== '#' &&
+               mapLayout[cell.r]?.[cell.c] !== 'D';
+      });
 
-        // تحاول تظهر خلف اللاعب (عكس اتجاه الكاميرا)
+      let spawnX, spawnZ;
+      if (candidates.length > 0) {
+        const cell = candidates[Math.floor(Math.random() * candidates.length)];
+        spawnX = cell.c * cs;
+        spawnZ = cell.r * cs;
+      } else {
+        // fallback: جانب اللاعب على مسافة 4 خلايا
         const fwd = new THREE.Vector3();
         this.camera.getWorldDirection(fwd);
         fwd.y = 0; fwd.normalize();
-
-        // ابحث عن خلية خلف اللاعب + بعيدة كافياً
-        const backDir = fwd.clone().negate();
-        const cs = this.maze.cellSize;
-        const camR = Math.round(this.camera.position.z / cs);
-        const camC = Math.round(this.camera.position.x / cs);
-
-        // اختر موضع ظهور: يفضّل الخلف ولكن أي مكان بعيد مقبول
-        const candidates = NavGraph.reachableList.filter(cell => {
-          const dr = cell.r - camR, dc = cell.c - camC;
-          const d = Math.hypot(dr, dc);
-          if (d < minDist / cs || d > maxDist / cs) return false;
-          if (mapLayout[cell.r][cell.c] === '#' || mapLayout[cell.r][cell.c] === 'D') return false;
-          return true;
-        });
-
-        // نرتب بحيث الأقرب لاتجاه الخلف يجيء أولاً
-        candidates.sort((a, b) => {
-          const adot = (a.c - camC) * backDir.x + (a.r - camR) * backDir.z;
-          const bdot = (b.c - camC) * backDir.x + (b.r - camR) * backDir.z;
-          return bdot - adot;
-        });
-
-        const picked = candidates.length > 0
-          ? candidates[Math.floor(Math.random() * Math.min(5, candidates.length))]
-          : null;
-
-        if (picked) {
-          this.group.position.set(picked.c * cs, 0, picked.r * cs);
-        } else {
-          // fallback: أمام الكاميرا
-          this.group.position.set(
-            this.camera.position.x + fwd.x * 3.5,
-            0,
-            this.camera.position.z + fwd.z * 3.5
-          );
-        }
-        this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
-        // ★ snap الكاميرا نحوها
-        this._triggerCameraSnap(playerRef);
-
-      } else if (mode === EnemySystem.MODE_WATCH) {
-        // من بعيد — 18-30 خلية
-        const pos = this._pickSpawnPos(18, 30);
-        if (pos) this.group.position.copy(pos);
-        this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
-        this._triggerCameraSnap(playerRef);
+        const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+        spawnX = this.camera.position.x + side.x * cs * 3 + fwd.x * cs * 3;
+        spawnZ = this.camera.position.z + side.z * cs * 3 + fwd.z * cs * 3;
       }
 
-      console.log(`[Slendrina] MODE ${mode} at dist=${
-        Math.hypot(
-          this.group.position.x - this.camera.position.x,
-          this.group.position.z - this.camera.position.z
-        ).toFixed(1)
+      this.group.position.set(spawnX, 0, spawnZ);
+      this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
+      this._triggerCameraSnap(playerRef);
+
+      console.log(`[Slendrina] FACE dist=${
+        Math.hypot(spawnX - this.camera.position.x, spawnZ - this.camera.position.z).toFixed(1)
       }m`);
     }
 
@@ -4609,11 +4551,7 @@ _buildDoor(x, z) {
     //  مرجّح بعدد الكتب المجموعة
     // ═══════════════════════════════════════════════
     _pickMode() {
-      const ratio = clamp(GameState.keysCollected / GameState.totalKeys, 0, 1);
-      // كلما جمعت كتباً أكثر — FACE أكثر وأكثر
-      const wFace  = 0.35 + ratio * 0.50;
-      const wWatch = 1.0 - wFace;
-      return Math.random() < wFace ? EnemySystem.MODE_FACE : EnemySystem.MODE_WATCH;
+      return EnemySystem.MODE_FACE; // وضع وحيد دائماً
     }
 
     // ═══════════════════════════════════════════════
@@ -4626,13 +4564,20 @@ _buildDoor(x, z) {
         .subVectors(this.group.position, this.camera.position);
       toSlend.y = 0; camDir.y = 0;
       const dist = toSlend.length();
-      if (dist < 0.1) return false;
+      if (dist < 0.5) return true; // قريبة جداً = دائماً تنظر إليها
       toSlend.normalize(); camDir.normalize();
-      const dot = camDir.dot(toSlend);
-      // في FACE: أي اتجاه يعتبر "نظر" (هي أمامك مباشرة)
-      // في WATCH: فقط إذا dot > 0.75 (شاهدتها من بعيد)
-      const threshold = this._mode === EnemySystem.MODE_FACE ? 0.0 : 0.75;
-      return dot > threshold;
+      // 0.3 = ~72° — نطاق واسع كافٍ للشعور بالنظر
+      return camDir.dot(toSlend) > 0.3;
+    }
+
+    // ═══════════════════════════════════════════════
+    //  نظام الغضب — يُستدعى من SpiderChild عند موت العنكبوت
+    // ═══════════════════════════════════════════════
+    triggerRage(playerRef) {
+      this._rageActive = true;
+      this._rageTimer  = 0;
+      this._rageBursts = 0;
+      console.log('[Slendrina] RAGE triggered!');
     }
 
     // ═══════════════════════════════════════════════
@@ -4917,10 +4862,23 @@ _buildDoor(x, z) {
     update(delta, playerPos, playerRef) {
       if (GameSettings.paused || GameState.captureActive) return;
 
-      // ★ تحديث انقلاب الكاميرا (snap) — يعمل في كل الأوضاع
       this._updateCameraSnap(delta, playerRef);
 
-      // ── العداد بين الظهورات ──
+      // ── نظام الغضب (بعد قتل العنكبوت) ──
+      if (this._rageActive) {
+        this._rageTimer += delta;
+        if (this._mode === 0 && this._rageBursts < 5 &&
+            this._rageTimer > this._rageBursts * 1.2 + 0.1) {
+          this._activateMode(EnemySystem.MODE_FACE, playerRef);
+          this._rageBursts++;
+        }
+        if (this._rageTimer > 6.5) {
+          this._rageActive = false;
+          this._rageTimer  = 0;
+        }
+      }
+
+      // ── عداد الظهور الطبيعي ──
       if (this._mode === 0) {
         this._cooldown -= delta;
         if (this._cooldown <= 0 && this._modelReady) {
@@ -4932,95 +4890,55 @@ _buildDoor(x, z) {
       const ex   = this.group.position.x;
       const ez   = this.group.position.z;
       const dist = Math.hypot(playerPos.x - ex, playerPos.z - ez);
+
+      // تواجه اللاعب دائماً
+      this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
+
+      // ── تتحرك نحو اللاعب مع collision صحيح ──
+      if (dist > this.FACE_DIST) {
+        const dx  = playerPos.x - ex;
+        const dz  = playerPos.z - ez;
+        const len = Math.hypot(dx, dz);
+        const nx  = dx / len, nz = dz / len;
+        const newX = ex + nx * this.MOVE_SPEED * delta;
+        const newZ = ez + nz * this.MOVE_SPEED * delta;
+        const r = this.ENEMY_RADIUS;
+        const col = this.maze.colliders;
+        const hit = (cx, cz) => col.some(c =>
+          cx + r > c.min.x && cx - r < c.max.x &&
+          cz + r > c.min.z && cz - r < c.max.z
+        );
+        if (!hit(newX, ez)) this.group.position.x = newX;
+        if (!hit(ex, newZ)) this.group.position.z = newZ;
+      }
+
+      // ── فحص النظر وقفل الشاشة ──
       const looking = this._playerLooking();
 
-      // ── صوت الاقتراب ──
-      if (AudioSys.ctx) {
-        EnemyAudio.init(AudioSys.ctx);
-        EnemyAudio.updateVolume(dist, 35);
-      }
-
-      // ════════════════════════════════════════
-      //  MODE_FACE — تظهر قريبة وتثبتك
-      // ════════════════════════════════════════
-      if (this._mode === EnemySystem.MODE_FACE) {
-        this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
-
-        // تتحرك ببطء نحو اللاعب (ليست chase — فقط تقترب خطوة)
-        if (dist > this.FACE_DIST + 0.1) {
-          const dx = playerPos.x - ex;
-          const dz = playerPos.z - ez;
-          const spd = 1.8; // بطيئة جداً — مش تجري
-          this.group.position.x += (dx / dist) * spd * delta;
-          this.group.position.z += (dz / dist) * spd * delta;
-        }
-
-        if (looking) {
-          this._stareTimer += delta;
-          const lockRatio = clamp(this._stareTimer / this.STARE_KILL, 0, 1);
-
-          // ★ قفل الشاشة قوي جداً — صعب جداً تميلها
-          // يبدأ من 60% قفل وينتهي بـ 98% قفل
-          const lockStrength = clamp(0.60 + lockRatio * 0.38, 0, 0.98);
-          if (playerRef) {
-            playerRef.mouseDelta.x *= (1 - lockStrength);
-            playerRef.mouseDelta.y *= (1 - lockStrength);
-            playerRef.joy.x        *= (1 - lockStrength * 0.95);
-            playerRef.joy.y        *= (1 - lockStrength * 0.95);
-          }
-
-          // دم يكثر
-          this._setBlood(lockRatio * 0.92);
-
-          // ★ تأثير اهتزاز الشاشة يزداد كلما اقتربت من الموت
-          if (lockRatio > 0.4 && playerRef) {
-            const shake = (lockRatio - 0.4) * 0.006;
-            playerRef.yaw   += (Math.random() - 0.5) * shake;
-            playerRef.pitch += (Math.random() - 0.5) * shake * 0.5;
-          }
-
-          if (this._stareTimer >= this.STARE_KILL) {
-            this._loseHeart(playerRef);
-            return;
-          }
-        } else {
-          // إذا أبعدت نظرك — تخف تدريجياً لكن أبطأ من قبل (أصعب للهرب)
-          this._stareTimer = Math.max(0, this._stareTimer - delta * 1.2);
-          this._setBlood(clamp(this._stareTimer / this.STARE_KILL, 0, 1) * 0.92);
-          if (this._stareTimer <= 0) {
-            this._deactivate();
-            return;
+      if (looking) {
+        this._stareTimer += delta;
+        const ratio = clamp(this._stareTimer / this.STARE_KILL, 0, 1);
+        const lock  = clamp(0.55 + ratio * 0.42, 0, 0.97);
+        if (playerRef) {
+          playerRef.mouseDelta.x *= (1 - lock);
+          playerRef.mouseDelta.y *= (1 - lock);
+          playerRef.joy.x        *= (1 - lock * 0.9);
+          playerRef.joy.y        *= (1 - lock * 0.9);
+          if (ratio > 0.45) {
+            const sh = (ratio - 0.45) * 0.005;
+            playerRef.yaw   += (Math.random() - 0.5) * sh;
+            playerRef.pitch += (Math.random() - 0.5) * sh * 0.4;
           }
         }
-        return;
-      }
-
-      // ════════════════════════════════════════
-      //  MODE_WATCH — من بعيد، عيون حمراء
-      // ════════════════════════════════════════
-      if (this._mode === EnemySystem.MODE_WATCH) {
-        this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
-
-        if (looking && dist < 40) {
-          this._stareTimer += delta;
-          this._setBlood(clamp(this._stareTimer / 5.0, 0, 0.35));
-          // بعد 3.5 ثواني نظر — تختفي وتتحول لـ FACE فجأة
-          if (this._stareTimer > 3.5) {
-            this._deactivate();
-            this._cooldown = 1.5; // تظهر فجأة بعد 1.5 ثانية في FACE
-            return;
-          }
-        } else {
-          this._stareTimer = Math.max(0, this._stareTimer - delta * 1.2);
-          this._setBlood(0);
+        this._setBlood(ratio * 0.9);
+        if (this._stareTimer >= this.STARE_KILL) {
+          this._loseHeart(playerRef);
+          return;
         }
-
-        // تختفي بعد 6-12 ثانية
-        this._chaseTimer += delta;
-        if (this._chaseTimer > rand(6, 12)) {
-          this._deactivate();
-        }
-        return;
+      } else {
+        this._stareTimer = Math.max(0, this._stareTimer - delta * 1.5);
+        this._setBlood(clamp(this._stareTimer / this.STARE_KILL, 0, 1) * 0.9);
+        if (this._stareTimer <= 0) this._deactivate();
       }
     } // نهاية update()
   }   // نهاية class EnemySystem
@@ -5050,7 +4968,7 @@ _buildDoor(x, z) {
       this._chaseTimer   = 0;
       this._biteTimer    = 0;
       this._totalBites   = 0;
-      this._modelReady   = false;
+      this._modelReady   = false; // سيصبح true فوراً في _buildModel
 
       this._grid         = null;
       this._gridRows     = 0;
@@ -5058,6 +4976,9 @@ _buildDoor(x, z) {
       this._currentPath  = null;
       this._pathTimer    = 999;
       this._pathStep     = 1;
+
+      // مسافة التوقف عن المطاردة
+      this.CHASE_STOP_DIST = 18; // خلايا — يتوقف لو بعد اللاعب كثيراً
 
       this.group = new THREE.Group();
       this.group.visible = false;
@@ -5069,8 +4990,15 @@ _buildDoor(x, z) {
     }
 
     _buildModel() {
+      // ★ ابن fallback فوراً — العنكبوت يظهر دائماً بغض النظر عن الـ GLB
+      this._buildFallback();
+      // حاول تحميل GLB — لو نجح يستبدل الـ fallback
       const loader = new THREE.GLTFLoader();
       loader.load('models/spider.glb', gltf => {
+        if (this._spiderModel) {
+          this.group.remove(this._spiderModel);
+          this._spiderModel = null;
+        }
         const model = gltf.scene;
         model.traverse(child => {
           if (child.isMesh && child.material) {
@@ -5078,7 +5006,6 @@ _buildDoor(x, z) {
             child.material.side = THREE.DoubleSide;
             child.material.emissive = new THREE.Color('#1a0000');
             child.material.emissiveIntensity = 0.5;
-            child.material.needsUpdate = true;
           }
         });
         const box = new THREE.Box3().setFromObject(model);
@@ -5088,11 +5015,9 @@ _buildDoor(x, z) {
         const ctr = box.getCenter(new THREE.Vector3());
         model.position.set(-ctr.x * s, -box.min.y * s, -ctr.z * s);
         this.group.add(model);
-        this._modelReady = true;
         console.log('[SpiderChild] GLB loaded ✅');
       }, undefined, () => {
-        console.warn('[SpiderChild] GLB failed — building fallback');
-        this._buildFallback();
+        console.log('[SpiderChild] No GLB — using fallback ✅');
       });
     }
 
@@ -5322,6 +5247,7 @@ _buildDoor(x, z) {
 
       const ex=this.group.position.x, ez=this.group.position.z;
       const dist=Math.hypot(playerPos.x-ex, playerPos.z-ez);
+      const distCells = dist / this.maze.cellSize;
 
       // تأثير القرب
       this._proxFX.style.opacity=clamp(1-dist/10,0,0.6).toString();
@@ -5335,7 +5261,15 @@ _buildDoor(x, z) {
         return;
       }
 
-      // BFS
+      // ★ يتوقف لو بعد اللاعب أكثر من CHASE_STOP_DIST خلايا
+      if(distCells > this.CHASE_STOP_DIST){
+        this._animateLegs(time); // يبقى موجوداً لكن لا يتحرك
+        this._chaseTimer+=delta;
+        if(this._chaseTimer>=this.CHASE_DUR) this._deactivate();
+        return;
+      }
+
+      // BFS pathfinding
       this._pathTimer+=delta;
       if(this._pathTimer>=0.5||!this._currentPath){
         this._pathTimer=0;
@@ -5369,6 +5303,23 @@ _buildDoor(x, z) {
       if(this._chaseTimer>=this.CHASE_DUR) this._deactivate();
     }
 
+    // ★ يُستدعى من checkShotHit لما الرصاصة تصيبه
+    hit(enemyRef) {
+      if(!this._active)return;
+      this._hp = (this._hp || 3) - 1;
+      console.log(`[SpiderChild] HIT — HP=${this._hp}`);
+      // وميض أحمر
+      this._biteFX.style.opacity='0.4';
+      setTimeout(()=>{ this._biteFX.style.opacity='0'; },120);
+      if(this._hp<=0){
+        console.log('[SpiderChild] DEAD — Slendrina RAGE!');
+        this._deactivate();
+        this._hp=3; // إعادة تعيين HP للمرة القادمة
+        // ★ سليندرينا تغضب
+        if(enemyRef) enemyRef.triggerRage();
+      }
+    }
+
     refreshGridForDoor(){ if(this._grid){this._currentPath=null;} }
   } // نهاية class SpiderChild
   // ============================================================
@@ -5388,6 +5339,10 @@ _buildDoor(x, z) {
     }
     btnSettings.addEventListener('click', toggleSettings);
     btnCloseSettings.addEventListener('click', toggleSettings);
+    btnCloseSettings.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      toggleSettings();
+    }, { passive: false });
     document.getElementById('sense-slider').addEventListener('input',  e => GameSettings.sensitivity = parseFloat(e.target.value));
     document.getElementById('sound-toggle').addEventListener('change', e => GameSettings.sound = e.target.checked);
     document.getElementById('music-toggle').addEventListener('change', e => {
@@ -5795,10 +5750,23 @@ _buildDoor(x, z) {
   let _lastShotCheck = 0;
 
   function checkShotHit(time) {
-    // Slendrina لا تتأثر بالطلقات — الرصاص للمراحل القادمة
     if (time - _lastShotCheck < 130) return;
     _lastShotCheck = time;
-    // محجوز للاستخدام المستقبلي
+    if (!player.justFired) return;
+    player.justFired = false;
+
+    // Raycaster من مركز الشاشة
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+    raycaster.far = 30;
+
+    // فحص العنكبوت فقط (سليندرينا لا تتأثر)
+    if (spider._active) {
+      const hits = raycaster.intersectObject(spider.group, true);
+      if (hits.length > 0 && hits[0].distance < 28) {
+        spider.hit(enemy);
+      }
+    }
   }
 
   // ============================================================
