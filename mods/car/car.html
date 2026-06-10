@@ -1,1 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لعبة السيارة</title>
 
+<style>
+body{
+    margin:0;
+    background:#222;
+    overflow:hidden;
+}
+
+#road{
+    width:100vw;
+    height:100vh;
+    background:#444;
+    position:relative;
+}
+
+#car{
+    width:60px;
+    height:100px;
+    background:red;
+    position:absolute;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+}
+</style>
+</head>
+<body>
+
+<div id="road">
+    <div id="car"></div>
+</div>
+
+<script>
+const car = document.getElementById("car");
+
+let x = window.innerWidth / 2 - 30;
+
+document.addEventListener("keydown",(e)=>{
+    if(e.key==="ArrowLeft") x-=20;
+    if(e.key==="ArrowRight") x+=20;
+
+    x=Math.max(0,Math.min(window.innerWidth-60,x));
+    car.style.left=x+"px";
+});
+</script>
+
+</body>
+</html>

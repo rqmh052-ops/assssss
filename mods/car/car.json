@@ -1,0 +1,9 @@
+{
+  "id": "car",
+  "name": "لعبة السيارة",
+  "author": "Ayman",
+  "version": "1.0",
+  "image": "mods/car/car.png",
+  "page": "mods/car/car.html",
+  "description": "لعبة سيارة بسيطة للتحرك يميناً ويساراً."
+}
