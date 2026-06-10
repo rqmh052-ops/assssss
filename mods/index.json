@@ -1,7 +1,7 @@
 {
   "mods": [
     {
-      "manifest": "mods/car/car.json"
+      "manifest": "car/car.json"
     }
   ]
 }
