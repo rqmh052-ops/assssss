@@ -6342,27 +6342,26 @@ _buildDoor(x, z) {
     </div>
   </div>
 
-  <!-- شريط التحكم العلوي -->
-  <div id="mod-topbar">
-    <!-- زر الرجوع -->
-    <button id="mod-back-btn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-      رجوع
-    </button>
+  <!-- ============================================================ -->
+  <!--  أدوات التحكم العائمة — فوق الـ iframe مباشرةً             -->
+  <!--  نفس أسلوب #top-controls في اللعبة الأساسية                -->
+  <!-- ============================================================ -->
+  <div id="mod-hud-overlay">
 
-    <!-- اسم المود -->
-    <div id="mod-topbar-name"></div>
+    <!-- Pills العائمة — طبق الأصل عن #top-controls في اللعبة -->
+    <div id="mod-top-controls">
 
-    <!-- أدوات اليمين -->
-    <div id="mod-topbar-tools">
-
-      <!-- عداد FPS -->
-      <div class="mod-pill" id="mod-fps-pill">FPS: –</div>
+      <!-- زر الإعدادات -->
+      <button class="mod-pill mod-pill-btn" id="mod-settings-btn">
+        الإعدادات
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
 
       <!-- جودة الجرافيك -->
-      <div class="mod-pill mod-pill-btn" id="mod-quality-pill" role="button" tabindex="0">
+      <div class="mod-pill mod-pill-btn" id="mod-quality-pill" role="button" aria-haspopup="true" aria-expanded="false" tabindex="0">
         <span id="mod-quality-label">Medium</span>
         <div id="mod-quality-menu">
           <div class="mod-qmenu-title">جودة الجرافيك</div>
@@ -6385,17 +6384,12 @@ _buildDoor(x, z) {
         </div>
       </div>
 
-      <!-- الإعدادات -->
-      <button class="mod-pill mod-pill-btn" id="mod-settings-btn">
-        الإعدادات
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-      </button>
+      <!-- عداد FPS -->
+      <div class="mod-pill" id="mod-fps-pill">FPS: –</div>
 
-    </div><!-- /mod-topbar-tools -->
-  </div><!-- /mod-topbar -->
+    </div><!-- /#mod-top-controls -->
+
+  </div><!-- /#mod-hud-overlay -->
 
   <!-- iframe المود -->
   <iframe id="mod-iframe" allowfullscreen></iframe>
@@ -6429,20 +6423,20 @@ _buildDoor(x, z) {
   inset: 0;
   z-index: 99000;
   display: none;
-  flex-direction: column;
   background: #0a0a0a;
   font-family: 'Cairo', system-ui, sans-serif;
   direction: rtl;
 }
 #mod-wrapper.mod-active {
-  display: flex;
+  display: block;   /* iframe fills 100% automatically */
+  position: fixed;
 }
 
 /* ---- شاشة التحميل ---- */
 #mod-loading-screen {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 100;
   background: radial-gradient(ellipse at center, #1a0000 0%, #000 75%);
   display: flex;
   align-items: center;
@@ -6505,72 +6499,41 @@ _buildDoor(x, z) {
   40%           { transform: scale(1.2); opacity: 1; background: #edd56a; }
 }
 
-/* ---- شريط التحكم ---- */
-#mod-topbar {
-  height: 42px;
-  min-height: 42px;
-  background: rgba(10, 13, 10, 0.97);
-  border-bottom: 1px solid rgba(237,213,106,0.18);
+/* ---- HUD overlay — يطفو فوق الـ iframe تماماً مثل top-controls ---- */
+#mod-wrapper {
+  /* الغلاف الآن flex-column بدون topbar: iframe يأخذ 100% */
+  flex-direction: column;
+}
+
+/* mod-hud-overlay: طبقة شفافة فوق الـ iframe */
+#mod-hud-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;   /* لا يحجب الـ iframe */
+  z-index: 20;
+}
+
+/* mod-top-controls: طبق الأصل عن #top-controls في اللعبة */
+#mod-top-controls {
+  position: absolute;
+  top: 8px;
+  left: 8px;
   display: flex;
-  align-items: center;
-  padding: 0 10px;
-  gap: 8px;
-  flex-shrink: 0;
-  direction: rtl;
-  z-index: 5;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  gap: 4px;
+  align-items: flex-start;
+  flex-direction: row-reverse;   /* ترتيب الـ RTL: إعدادات | جودة | FPS */
+  pointer-events: auto;          /* الأزرار قابلة للضغط */
+  z-index: 21;
 }
 
-#mod-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(139,0,0,0.25);
-  border: 1px solid rgba(139,0,0,0.5);
-  color: #ff8080;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s, box-shadow 0.15s;
-  flex-shrink: 0;
-  direction: rtl;
-}
-#mod-back-btn:hover { background: rgba(139,0,0,0.45); box-shadow: 0 0 12px rgba(139,0,0,0.4); }
-#mod-back-btn:active { transform: scale(0.96); }
-
-#mod-topbar-name {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(237,213,106,0.7);
-  text-align: center;
-  letter-spacing: 1px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#mod-topbar-tools {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-  direction: ltr;
-}
-
-/* ---- الـ pills ---- */
+/* Pills — نفس .pill في اللعبة الأساسية */
 .mod-pill {
   height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 0 9px;
+  gap: 6px;
+  padding: 0 8px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(13,17,16,0.92);
@@ -6578,17 +6541,18 @@ _buildDoor(x, z) {
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
-  font-family: inherit;
+  font-family: 'Cairo', system-ui, sans-serif;
+  backdrop-filter: blur(6px);
 }
 .mod-pill-btn {
   cursor: pointer;
   border: none;
-  transition: background 0.12s;
+  transition: background 0.12s, box-shadow 0.12s;
 }
-.mod-pill-btn:hover { background: rgba(30,40,28,0.97); box-shadow: 0 0 0 1px rgba(237,213,106,0.3); }
+.mod-pill-btn:hover  { background: rgba(30,40,28,0.97); box-shadow: 0 0 0 1px rgba(237,213,106,0.3); }
 .mod-pill-btn:active { transform: scale(0.97); }
 
-#mod-fps-pill { color: #eef2f6; min-width: 62px; }
+#mod-fps-pill     { color: #eef2f6; min-width: 62px; }
 #mod-quality-pill { color: #edd56a; min-width: 64px; position: relative; }
 #mod-quality-pill::after {
   content: '';
@@ -6601,7 +6565,6 @@ _buildDoor(x, z) {
   transition: transform 0.2s;
 }
 #mod-quality-pill.open::after { transform: rotate(180deg); }
-
 #mod-settings-btn { color: #eef2f6; gap: 5px; border: 1px solid rgba(255,255,255,0.10); }
 
 /* ---- قائمة الجودة ---- */
@@ -6629,34 +6592,23 @@ _buildDoor(x, z) {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .mod-qmenu-title {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 9px; font-weight: 700;
   color: rgba(237,213,106,0.5);
-  text-align: center;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-align: center; letter-spacing: 0.08em; text-transform: uppercase;
   padding: 2px 4px 5px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   margin-bottom: 2px;
 }
 .mod-qmenu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s;
-  direction: rtl;
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 8px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s; direction: rtl;
 }
-.mod-qmenu-item:hover { background: rgba(237,213,106,0.08); border-color: rgba(237,213,106,0.18); }
+.mod-qmenu-item:hover  { background: rgba(237,213,106,0.08); border-color: rgba(237,213,106,0.18); }
 .mod-qmenu-item.active { background: rgba(237,213,106,0.13); border-color: rgba(237,213,106,0.4); }
 .mod-qmenu-item.active .mod-qitem-name { color: #edd56a; }
-.mod-qitem-dot {
-  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
-  box-shadow: 0 0 5px currentColor;
-}
+.mod-qitem-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 5px currentColor; }
 .mod-qitem-dot.low    { background: #ff4444; color: #ff4444; }
 .mod-qitem-dot.medium { background: #ffaa00; color: #ffaa00; }
 .mod-qitem-dot.high   { background: #44ccff; color: #44ccff; }
@@ -6664,13 +6616,23 @@ _buildDoor(x, z) {
 .mod-qitem-name { font-size: 12px; font-weight: 700; color: #eef2f6; }
 .mod-qitem-desc { font-size: 9px; color: rgba(196,207,190,0.55); direction: ltr; }
 
-/* ---- الـ iframe ---- */
+/* موبايل */
+@media (max-width: 480px) {
+  #mod-top-controls { top: 6px; left: 6px; gap: 3px; }
+  .mod-pill { height: 24px; font-size: 10px; padding: 0 7px; }
+  #mod-fps-pill, #mod-quality-pill { min-width: 50px; }
+}
+
+/* ---- الـ iframe — يأخذ كامل الغلاف ---- */
 #mod-iframe {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   border: none;
   width: 100%;
+  height: 100%;
   display: block;
   background: #000;
+  z-index: 1;
 }
 
 /* ---- overlay الإعدادات ---- */
@@ -6680,7 +6642,7 @@ _buildDoor(x, z) {
   display: grid;
   place-items: center;
   background: rgba(0,0,0,0.7);
-  z-index: 50;
+  z-index: 60;
   transition: opacity 0.2s;
   backdrop-filter: blur(4px);
 }
@@ -6748,10 +6710,9 @@ _buildDoor(x, z) {
 
 /* ---- موبايل ---- */
 @media (max-width: 480px) {
-  #mod-topbar { height: 38px; min-height: 38px; padding: 0 7px; gap: 5px; }
-  #mod-back-btn { height: 24px; padding: 0 9px; font-size: 10px; }
+  #mod-top-controls { top: 6px; left: 6px; gap: 3px; }
   .mod-pill { height: 24px; font-size: 10px; padding: 0 7px; }
-  #mod-topbar-name { font-size: 10px; }
+  #mod-fps-pill, #mod-quality-pill { min-width: 50px; }
 }
 </style>
 
@@ -6764,9 +6725,7 @@ _buildDoor(x, z) {
   const wrapper       = document.getElementById('mod-wrapper');
   const loadingScreen = document.getElementById('mod-loading-screen');
   const loadingTitle  = document.getElementById('mod-loading-title');
-  const topbarName    = document.getElementById('mod-topbar-name');
   const iframe        = document.getElementById('mod-iframe');
-  const backBtn       = document.getElementById('mod-back-btn');
   const fpsPill       = document.getElementById('mod-fps-pill');
 
   // Quality
@@ -6886,9 +6845,8 @@ _buildDoor(x, z) {
     detectInitialQuality();
     syncQualityUI(currentQuality);
 
-    // اسم المود في الشريط وشاشة التحميل
+    // اسم المود في شاشة التحميل فقط (لا يوجد شريط علوي)
     const modName = mod.name || 'مود';
-    topbarName.textContent   = modName;
     loadingTitle.textContent = modName;
 
     // أوقف اللعبة الأساسية (Three.js + lobby renderer)
@@ -6957,10 +6915,8 @@ _buildDoor(x, z) {
     } catch(e) {}
   }
 
-  backBtn.addEventListener('click', closeModWrapper);
-  backBtn.addEventListener('touchend', e => { e.preventDefault(); closeModWrapper(); }, { passive: false });
-
-  // مفتاح Escape يغلق الإعدادات أولاً، ثم المود
+  // زر رجوع مودات — موجود في overlay الإعدادات فقط
+  // Escape يغلق الإعدادات أولاً، ثم المود
   document.addEventListener('keydown', e => {
     if (!wrapper.classList.contains('mod-active')) return;
     if (e.key === 'Escape') {
