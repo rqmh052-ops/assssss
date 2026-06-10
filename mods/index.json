@@ -1,0 +1,7 @@
+{
+  "mods": [
+    {
+      "manifest": "mods/car/car.json"
+    }
+  ]
+}
