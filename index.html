@@ -1449,18 +1449,22 @@
     const source = typeof entry === 'string' ? { manifest: entry } : (entry || {});
     const manifestRef = source.manifest || source.manifestPath || source.manifest_url || source.json || source.manifestFile;
     let merged = source;
+    let resolvedBaseUrl = baseUrl;
 
     if (manifestRef) {
       const manifestUrl = resolveIndexRef(manifestRef, baseUrl);
       try {
         const manifestData = await fetchJSON(manifestUrl);
         merged = { ...manifestData, ...source, manifest: manifestUrl };
+        // ✅ FIX: use the manifest's own URL as baseUrl so relative paths
+        // like "car.html" resolve to mods/car/car.html (not mods/car.html)
+        resolvedBaseUrl = manifestUrl;
       } catch (err) {
         console.warn('[Mods] mod manifest load failed:', manifestRef, err);
       }
     }
 
-    return normalizeMod(merged, index, baseUrl);
+    return normalizeMod(merged, index, resolvedBaseUrl);
   }
 
   async function loadModsCatalog() {
