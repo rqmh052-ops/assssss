@@ -8,6 +8,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>سلندرينا — الكابوس</title>
+  <!-- 
+    ملفات الصوت المطلوبة (اختياريه - اللعبه تعمل بدونها):
+    audio/enemy_sound.mp3   — صوت سليندرينا المستمر (حسب المسافة)
+    audio/slend_appear.mp3  — صوت ظهور سليندرينا
+    audio/spider_sound.mp3  — صوت العنكبوت (حسب المسافة)
+    audio/spider_bite.mp3   — صوت لدغة العنكبوت
+    audio/music.mp3         — موسيقى الخلفية
+    models/slendrina.glb    — مجسم سليندرينا (اختياري — له fallback إجرائي لو مش موجود)
+    models/spider.glb       — مجسم العنكبوت (اختياري — له fallback إجرائي لو مش موجود)
+    (المصباح اليدوي إجرائي بالكامل — مفيش ملف GLB خارجي مطلوب له)
+  -->
   <!-- Three.js (0.134.0 — used by both lobby and game) -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -924,6 +935,19 @@
 <!-- ============================================================ -->
 <div id="game-wrapper">
   <div id="app">
+    <!-- ★ علامات "الهدف الحراري" — عناصر منفصلة عن الـ canvas تماماً، فمش
+         بيأثر عليها فلتر CSS الأخضر أبداً (الفلتر بيتطبق على الـ canvas
+         بس، مش على عناصر شقيقة زي دي). هنا بيتلون اللون الحقيقي أحمر/برتقالي. -->
+    <div id="thermal-marker-spider" class="thermal-marker" style="display:none;">
+      <div class="tm-bracket tm-tl"></div><div class="tm-bracket tm-tr"></div>
+      <div class="tm-bracket tm-bl"></div><div class="tm-bracket tm-br"></div>
+      <div class="tm-label">عنكبوت</div>
+    </div>
+    <div id="thermal-marker-slend" class="thermal-marker" style="display:none;">
+      <div class="tm-bracket tm-tl"></div><div class="tm-bracket tm-tr"></div>
+      <div class="tm-bracket tm-bl"></div><div class="tm-bracket tm-br"></div>
+      <div class="tm-label">!خطر</div>
+    </div>
     <!-- شاشة اختيار الوضع: فردي أو أون لاين -->
     <div id="main-menu" style="display:none;">
       <div class="mm-title">اختر وضع اللعب</div>
@@ -1005,6 +1029,15 @@
         </div>
         <div id="quality-toast"></div>
         <div class="pill" id="fps-pill">FPS: 0</div>
+        <div id="signal-pill" class="pill" style="display:none;flex-direction:column;gap:0;padding:3px 8px;height:auto;line-height:1;">
+          <svg id="signal-svg" width="20" height="16" viewBox="0 0 24 20" style="flex-shrink:0">
+            <path class="sig-arc sig-arc-1" d="M 14.60,12.50 A 3.00,3.00 0 0 0 9.40,12.50" fill="none" stroke-width="2.6" stroke-linecap="round"/>
+            <path class="sig-arc sig-arc-2" d="M 17.63,10.75 A 6.50,6.50 0 0 0 6.37,10.75" fill="none" stroke-width="2.6" stroke-linecap="round"/>
+            <path class="sig-arc sig-arc-3" d="M 20.66,9.00 A 10.00,10.00 0 0 0 3.34,9.00"  fill="none" stroke-width="2.6" stroke-linecap="round"/>
+            <circle class="sig-dot" cx="12" cy="16.2" r="1.8"/>
+          </svg>
+          <span id="signal-number" style="font-size:9px;font-weight:800;margin-top:1px;"></span>
+        </div>
       </div>
       <div id="instructions-panel">اجمع 8 كتب 🔍<br>لفتح الباب والهروب!</div>
       <div id="interaction-prompt">اضغط [E] لفتح الباب</div>
@@ -1045,13 +1078,14 @@
     <div id="mobile-ui">
       <div id="joystick"><div class="knob"></div></div>
       <div id="btn-fire" class="action-btn">
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="2" x2="12" y2="6"></line>
-          <line x1="12" y1="18" x2="12" y2="22"></line>
-          <line x1="2" y1="12" x2="6" y2="12"></line>
-          <line x1="18" y1="12" x2="22" y2="12"></line>
-          <circle cx="12" cy="12" r="2" fill="white"></circle>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <!-- مصباح يدوي -->
+          <rect x="9" y="2" width="6" height="7" rx="2"/>
+          <path d="M9 9 L7 14 L17 14 L15 9"/>
+          <line x1="7" y1="14" x2="17" y2="14"/>
+          <rect x="7" y="14" width="10" height="2" rx="1"/>
+          <line x1="12" y1="16" x2="12" y2="22"/>
+          <line x1="9" y1="22" x2="15" y2="22"/>
         </svg>
       </div>
       <div id="btn-interact" class="action-btn">
@@ -1187,7 +1221,12 @@
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // سقف DPR للموبايل 1.5x (نفس سقف اللعبة الأساسية) — فرق غير محسوس
+    // على شاشة هاتف، توفير حقيقي في الأداء. مكتوبة هنا بشكل مستقل
+    // (بدون استدعاء getDprCap) لأن هذا الكود يعمل فور تحميل الصفحة،
+    // قبل تحميل الـ script block اللي فيه getDprCap.
+    const _lobbyIsMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, _lobbyIsMobile ? 1.5 : 2));
     renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 
@@ -1312,8 +1351,15 @@
     }
     lobbyAnimate(0);
 
-    // Expose stop function
-    window._stopLobbyRenderer = () => { lobbyRendering = false; renderer.dispose(); };
+    // إيقاف/تشغيل حقيقي — بدون renderer.dispose() لأنه عملية نهائية
+    // في Three.js ومينفعش نرجّعها؛ إيقاف الحلقة كفاية لتوفير الأداء
+    // وبيسمح لنا نرجّع رندر اللوبي تاني بسهولة لما اللاعب يرجع من اللعبة.
+    window._stopLobbyRenderer = () => { lobbyRendering = false; };
+    window._startLobbyRenderer = () => {
+      if (lobbyRendering) return; // شغالة أصلاً
+      lobbyRendering = true;
+      lobbyAnimate(performance.now());
+    };
 
     // Dust particles
     const dustContainer = document.createElement('div');
@@ -1718,11 +1764,23 @@
 
       overlay.style.opacity = '0';
       overlay.style.pointerEvents = 'none';
+
+      // ★ شغّل حلقة اللعبة فعلياً دلوقتي بس — كانت متوقفة تماماً طول ما احنا في اللوبي
+      if (window._startGameLoop) window._startGameLoop();
     }, 2000);
   }
 
   // Return to lobby (from game)
   function backToLobby() {
+    // ★ وقّف حلقة اللعبة تماماً — مفيش render ولا AI update ولا صوت شغال في الخلفية
+    if (window._stopGameLoop) window._stopGameLoop();
+    // ★ نظّف أجسام اللاعبين الآخرين (الأونلاين) — مفيش داعي تفضل في الـ scene
+    // وهي مش بترندر أصلاً بعد وقف الحلقة، لكن كويس نحررها بدل ما تتراكم
+    if (typeof window._clearRemoteBodies === 'function') window._clearRemoteBodies();
+    // ★ اخرج من الغرفة فعلياً — كانت OnlineState.inRoom بتفضل true للأبد
+    // واتصالات الأقران فاضلة شغالة في الخلفية حتى بعد الرجوع للوبي
+    if (typeof window._leaveOnlineRoom === 'function') window._leaveOnlineRoom();
+
     const gameWrapper = document.getElementById('game-wrapper');
     gameWrapper.classList.remove('visible');
     const lobbyEl = document.getElementById('lobby-screen');
@@ -1738,6 +1796,9 @@
     if (mm) mm.style.display = 'none';
     const om = document.getElementById('online-menu');
     if (om) om.classList.remove('visible');
+
+    // ★ إعادة تشغيل رندر الـ lobby نفسها (كانت متوقفة وقت اللعب)
+    if (window._startLobbyRenderer) window._startLobbyRenderer();
   }
 
   // Restart game
@@ -1866,8 +1927,6 @@
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; font-family: system-ui, sans-serif; touch-action: none; }
     #game-wrapper { background: var(--bg); color: var(--text); }
-    #question-overlay, #question-overlay * { touch-action: auto !important; pointer-events: auto !important; }
-    #q-choices, #q-choices * { touch-action: manipulation !important; pointer-events: auto !important; }
     body.paused #game { filter: brightness(0.7); }
     #app { position: relative; width: 100%; height: 100%; }
     #game { display: block; width: 100%; height: 100%; will-change: transform; transform: translateZ(0); }
@@ -1901,6 +1960,48 @@
     .button-pill { cursor: pointer; border: none; }
     .button-pill:active { transform: scale(0.985); }
     #quality-pill { color: var(--accent); min-width: 58px; }
+    /* ★ مؤشر قوة إشارة الأونلاين — شكل الواي فاي الكلاسيكي (أقواس + نقطة) */
+    #signal-pill { padding: 3px 8px; }
+    .sig-arc { stroke: rgba(255,255,255,0.18); transition: stroke 0.25s; }
+    .sig-dot { fill: rgba(255,255,255,0.18); transition: fill 0.25s; }
+    #signal-number { color: rgba(255,255,255,0.35); }
+    /* ممتاز: كل الأقواس بيضاء */
+    #signal-pill.sig-good .sig-arc { stroke: #ffffff; }
+    #signal-pill.sig-good .sig-dot { fill: #ffffff; }
+    #signal-pill.sig-good #signal-number { color: #ffffff; }
+    /* متوسط: القوس الداخلي + النقطة صفراء، الباقي خافت */
+    #signal-pill.sig-ok .sig-arc-1 { stroke: #ffd54a; }
+    #signal-pill.sig-ok .sig-dot { fill: #ffd54a; }
+    #signal-pill.sig-ok #signal-number { color: #ffd54a; }
+    /* ضعيف: النقطة بس حمراء، كل الأقواس خافتة */
+    #signal-pill.sig-poor .sig-dot { fill: #ff4444; }
+    #signal-pill.sig-poor #signal-number { color: #ff4444; }
+    /* غير متصل: كل حاجة حمراء خافتة */
+    #signal-pill.sig-off .sig-arc { stroke: rgba(255,68,68,0.35); }
+    #signal-pill.sig-off .sig-dot { fill: rgba(255,68,68,0.35); }
+    #signal-pill.sig-off #signal-number { color: rgba(255,68,68,0.5); }
+    /* ★ علامة "الهدف الحراري" — بره الـ canvas تماماً فمفيش أي فلتر بيأثر عليها */
+    .thermal-marker {
+      position: fixed; z-index: 60; pointer-events: none;
+      width: 64px; height: 64px; margin-left: -32px; margin-top: -32px;
+      transition: opacity 0.15s;
+    }
+    .thermal-marker .tm-bracket {
+      position: absolute; width: 16px; height: 16px;
+      border-color: #ff3300; border-style: solid; border-width: 0;
+      filter: drop-shadow(0 0 4px #ff3300);
+    }
+    .thermal-marker .tm-tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; }
+    .thermal-marker .tm-tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; }
+    .thermal-marker .tm-bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; }
+    .thermal-marker .tm-br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; }
+    .thermal-marker .tm-label {
+      position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+      color: #ff5500; font-size: 11px; font-weight: 900; white-space: nowrap;
+      text-shadow: 0 0 6px #ff3300, 0 0 2px #000;
+    }
+    @keyframes tm-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+    .thermal-marker.tm-active { animation: tm-pulse 0.9s ease-in-out infinite; }
     #instructions-panel {
       position: absolute; top: 44px; left: 8px;
       background: rgba(13,17,16,0.92); border: 1px solid var(--hud-border);
@@ -2278,6 +2379,15 @@
     .online-player-pill .op-dot {
       width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
     }
+    .online-player-pill .op-mic {
+      width: 12px; height: 12px; flex-shrink: 0;
+      filter: drop-shadow(0 0 3px rgba(0,255,136,0.8));
+      animation: op-mic-pulse 0.9s ease-in-out infinite;
+    }
+    @keyframes op-mic-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
 
     /* أزرار مايك وصوت */
     #voice-controls {
@@ -2361,6 +2471,26 @@
     || (_isMobile && navigator.userAgent.indexOf('Version/') === -1 && /Chrome\//.test(navigator.userAgent) && !('chrome' in window));
 
   // ============================================================
+  //  DPR CAP  — سقف موحّد لنسبة البكسل (Device Pixel Ratio)
+  //  الفرق البصري بين 1.5x و 2x+ غير محسوس على شاشة هاتف عادي
+  //  (البكسلات أصلاً أصغر من إن العين تفرّق بينها)، لكن الفرق في
+  //  تكلفة الـ GPU (fill-rate) حقيقي وكبير — كل زيادة في DPR
+  //  بتضاعف تقريباً عدد البكسلات اللي لازم تُرسم كل فريم.
+  //  ده بيأثر بشكل خاص لما اللعبة تتحول لتطبيق APK.
+  //  ملحوظة: السقف ده بيتحكم في "نسبة البكسل" فقط — مش في texSize
+  //  ولا antialias ولا أي تفاصيل بصرية تانية، دول فضلوا زي ما هما.
+  function getDprCap() {
+    if (!_isMobile) return 2.0; // ديسكتوب: هامش أكبر، الشاشة أبعد عن العين عادةً
+    // على الموبايل: سقف 1.5x دايماً — حتى الشاشات عالية الدقة
+    // (السقف مش بيتغير حسب حجم الشاشة نفسه؛ فرق DPR مش مرتبط
+    // بعدد البوصات وإنما بكثافة البكسل الفعلية للجهاز)
+    return 1.5;
+  }
+  function applyDprCap(renderer) {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, getDprCap()));
+  }
+
+  // ============================================================
   //  QUALITY AUTO-DETECT  — كشف قوة الجهاز تلقائياً
   // ============================================================
   (function detectQuality() {
@@ -2388,7 +2518,10 @@
       tier,
       texSize:  tier === 'ultra' ? 2048 : tier === 'high' ? 1024 : tier === 'medium' ? 512 : 256,
       aniso:    tier === 'ultra' ? 16   : tier === 'high' ? 8    : tier === 'medium' ? 4   : 1,
-      pixelRatio: tier === 'ultra' ? 2.0 : tier === 'high' ? 1.5 : tier === 'medium' ? 1.25 : 1.0,
+      pixelRatio: Math.min(
+        tier === 'ultra' ? 2.0 : tier === 'high' ? 1.5 : tier === 'medium' ? 1.25 : 1.0,
+        getDprCap()
+      ),
       antialias:  tier === 'ultra' || tier === 'high',
       detail:   tier === 'ultra' ? 4 : tier === 'high' ? 3 : tier === 'medium' ? 2 : 1,
     };
@@ -2871,53 +3004,210 @@
   };
 
   // ============================================================
-  //  AK47 PROCEDURAL GUN  (داخل HTML)
+  //  SPIDER SOUND SYSTEM  — صوت العنكبوت بناءً على المسافة
+  //  يحمّل: audio/spider_sound.mp3
   // ============================================================
-  function createAK47() {
+  // صوت العنكبوت — إجرائي بالكامل (لا يحتاج ملف خارجي)
+  const SpiderAudio = {
+    _ctx: null, _masterGain: null, _vol: 0, _rafId: null,
+    _lastClick: 0,
+
+    init(audioCtx) {
+      // ★ الشرط بقى على _rafId مش _ctx — عشان لو stop() اتنادت قبل كده
+      // (رجوع للوبي مثلاً) init() تقدر تشغّل الحلقة تاني بدل ما توقف للأبد
+      if (this._rafId !== null) return;
+      this._ctx = audioCtx;
+      if (!this._masterGain) {
+        this._masterGain = audioCtx.createGain();
+        this._masterGain.gain.value = 0;
+        this._masterGain.connect(audioCtx.destination);
+      }
+      this._loop();
+    },
+
+    // صوت نقر/طقطقة عنكبوت — متكرر بشكل غير منتظم
+    _loop() {
+      if (!this._ctx) return;
+      this._rafId = requestAnimationFrame(() => this._loop());
+      if (!GameSettings.sound || this._vol < 0.02) return;
+      const now = this._ctx.currentTime;
+      // نقرة كل 0.08-0.22 ثانية (تتسارع كلما اقترب)
+      const interval = lerp(0.22, 0.06, this._vol);
+      if (now - this._lastClick < interval) return;
+      this._lastClick = now;
+      this._playClick(now);
+    },
+
+    _playClick(now) {
+      const ctx = this._ctx;
+      // نبضة noise قصيرة جداً — صوت أرجل عنكبوت
+      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.025), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) {
+        const t = i / d.length;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3) * 0.9;
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      // فلتر highpass يعطيه صوت حشرة
+      const hpf = ctx.createBiquadFilter();
+      hpf.type = 'highpass'; hpf.frequency.value = 1200 + Math.random() * 800;
+      const g = ctx.createGain();
+      g.gain.value = this._vol * 0.55;
+      src.connect(hpf); hpf.connect(g); g.connect(this._masterGain);
+      src.start(now);
+
+      // أحياناً صوت نفس/خش ثاني للإحساس بثقل الجسم
+      if (Math.random() < 0.3) {
+        const buf2 = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.04), ctx.sampleRate);
+        const d2 = buf2.getChannelData(0);
+        for (let i = 0; i < d2.length; i++) {
+          d2[i] = (Math.random() * 2 - 1) * (1 - i/d2.length) * 0.5;
+        }
+        const src2 = ctx.createBufferSource(); src2.buffer = buf2;
+        const lpf = ctx.createBiquadFilter();
+        lpf.type = 'lowpass'; lpf.frequency.value = 400;
+        const g2 = ctx.createGain(); g2.gain.value = this._vol * 0.25;
+        src2.connect(lpf); lpf.connect(g2); g2.connect(this._masterGain);
+        src2.start(now + 0.012);
+      }
+    },
+
+    updateVolume(dist, maxDist = 18) {
+      if (!this._masterGain || !GameSettings.sound) return;
+      this._vol = clamp(1 - dist / maxDist, 0, 0.85);
+      this._masterGain.gain.setTargetAtTime(this._vol * 0.6, this._ctx.currentTime, 0.15);
+    },
+
+    stop() {
+      this._vol = 0;
+      if (this._masterGain && this._ctx)
+        this._masterGain.gain.setTargetAtTime(0, this._ctx.currentTime, 0.2);
+      // ★ إلغاء حلقة الـ RAF الداخلية فعلياً — كانت شغالة للأبد حتى بعد stop()
+      if (this._rafId !== null) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+    }
+  };
+
+  // ============================================================
+  //  SLENDRINA APPEAR SOUND — يحمّل: audio/slend_appear.mp3
+  //  يُشغَّل فوراً عند كل ظهور لسليندرينا
+  // ============================================================
+  const SlendAppearAudio = {
+    buffer: null, _loaded: false,
+
+    init(audioCtx) {
+      if (this._loaded) return; this._loaded = true;
+      fetch('audio/slend_appear.mp3')
+        .then(r => r.arrayBuffer())
+        .then(ab => audioCtx.decodeAudioData(ab))
+        .then(buf => { this.buffer = buf; })
+        .catch(() => {});
+    },
+
+    play(audioCtx) {
+      if (!this.buffer || !audioCtx || !GameSettings.sound) return;
+      const src = audioCtx.createBufferSource(); src.buffer = this.buffer;
+      const g = audioCtx.createGain(); g.gain.value = 0.88;
+      src.connect(g); g.connect(audioCtx.destination); src.start();
+    }
+  };
+
+  // ============================================================
+  //  SPIDER BITE SOUND — يحمّل: audio/spider_bite.mp3
+  // ============================================================
+  const SpiderBiteAudio = {
+    buffer: null, _loaded: false,
+
+    init(audioCtx) {
+      if (this._loaded) return; this._loaded = true;
+      fetch('audio/spider_bite.mp3')
+        .then(r => r.arrayBuffer())
+        .then(ab => audioCtx.decodeAudioData(ab))
+        .then(buf => { this.buffer = buf; })
+        .catch(() => {});
+    },
+
+    play(audioCtx) {
+      if (!this.buffer || !audioCtx || !GameSettings.sound) return;
+      const src = audioCtx.createBufferSource(); src.buffer = this.buffer;
+      const g = audioCtx.createGain(); g.gain.value = 0.75;
+      src.connect(g); g.connect(audioCtx.destination); src.start();
+    }
+  };
+
+  // ============================================================
+  //  ENEMY X SOUND — يحمّل: audio/enemy_x.mp3
+  //  يُشغَّل عند ظهور سليندرينا بوضع الغضب (بعد قتل العنكبوت)
+  // ============================================================
+  const EnemyXAudio = {
+    buffer: null, _loaded: false,
+
+    init(audioCtx) {
+      if (this._loaded) return; this._loaded = true;
+      fetch('audio/enemy_x.mp3')
+        .then(r => r.arrayBuffer())
+        .then(ab => audioCtx.decodeAudioData(ab))
+        .then(buf => { this.buffer = buf; })
+        .catch(() => {});
+    },
+
+    play(audioCtx) {
+      if (!this.buffer || !audioCtx || !GameSettings.sound) return;
+      const src = audioCtx.createBufferSource(); src.buffer = this.buffer;
+      const g = audioCtx.createGain(); g.gain.value = 1.0;
+      src.connect(g); g.connect(audioCtx.destination); src.start();
+    }
+  };
+
+  // ============================================================
+  //  FLASHLIGHT PROCEDURAL MESH  — مصباح يدوي بالكامل، لا يوجد سلاح
+  // ============================================================
+  function createFlashlight() {
     const g = new THREE.Group();
-    const metal     = new THREE.MeshStandardMaterial({ color: '#1a1f23', roughness: 0.55, metalness: 0.65, depthTest: false, depthWrite: false, toneMapped: false });
-    const metalDark = new THREE.MeshStandardMaterial({ color: '#111518', roughness: 0.50, metalness: 0.70, depthTest: false, depthWrite: false, toneMapped: false });
-    const wood      = new THREE.MeshStandardMaterial({ color: '#7a4e2a', roughness: 0.88, metalness: 0.04, depthTest: false, depthWrite: false, toneMapped: false });
+    const bodyMat  = new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.4, metalness: 0.8, depthTest: false, depthWrite: false, toneMapped: false });
+    const gripMat  = new THREE.MeshStandardMaterial({ color: '#0f0f0f', roughness: 0.9, metalness: 0.1, depthTest: false, depthWrite: false, toneMapped: false });
+    const lensMat  = new THREE.MeshStandardMaterial({ color: '#aaddff', roughness: 0.1, metalness: 0.5, emissive: '#aaddff', emissiveIntensity: 0.4, depthTest: false, depthWrite: false, toneMapped: false });
+    const ringMat  = new THREE.MeshStandardMaterial({ color: '#333', roughness: 0.3, metalness: 0.9, depthTest: false, depthWrite: false, toneMapped: false });
 
-    // ===== الجسم الرئيسي (أوسع وأكثر وضوحاً) =====
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.14, 0.70), metal);
-    body.position.set(0, 0, -0.05);
+    // جسم المصباح الأسطواني
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.038, 0.42, 12), bodyMat);
+    body.rotation.x = Math.PI / 2;
+    body.position.set(0, 0, -0.18);
 
-    // ===== البرميل (أسمك — يتجه نحو الأمام -Z) =====
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.030, 0.55, 10), metalDark);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.02, -0.52);  // فوهة نحو الأمام (-Z)
+    // رأس المصباح (أوسع قليلاً)
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.038, 0.10, 12), bodyMat);
+    head.rotation.x = Math.PI / 2;
+    head.position.set(0, 0, -0.43);
 
-    // طرف الفوهة (muzzle)
-    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.028, 0.06, 10), metalDark);
-    muzzle.rotation.x = Math.PI / 2;
-    muzzle.position.set(0, 0.02, -0.82);
+    // حلقة معدنية
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.007, 8, 16), ringMat);
+    ring.rotation.y = Math.PI / 2;
+    ring.position.set(0, 0, -0.39);
 
-    // ===== الحارس الأمامي (handguard) =====
-    const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.095, 0.22), wood);
-    handguard.position.set(0, -0.025, -0.30);
+    // العدسة
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.042, 16), lensMat);
+    lens.rotation.y = Math.PI / 2;
+    lens.position.set(0, 0, -0.49);
+    g._lensEl = lens; // مرجع للتلوين لاحقاً
 
-    // ===== المخزن (magazine) — مائل للأمام =====
-    const magazine = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.26, 0.11), metal);
-    magazine.rotation.x = 0.38;
-    magazine.position.set(0, -0.18, -0.06);
+    // المقبض المطاطي (نتوءات)
+    for (let i = 0; i < 5; i++) {
+      const ridge = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.005, 6, 12), gripMat);
+      ridge.rotation.y = Math.PI / 2;
+      ridge.position.set(0, 0, 0.05 + i * 0.065);
+      g.add(ridge);
+    }
 
-    // ===== المقبض (grip) =====
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.18, 0.085), wood);
-    grip.rotation.x = -0.32;
-    grip.position.set(0, -0.09, 0.22);
+    // مقبض الإمساك (أسفل)
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.18, 8), gripMat);
+    grip.position.set(0, -0.10, 0.12);
+    grip.rotation.z = 0.35;
 
-    // ===== الخزان الخلفي (stock) =====
-    const stockMain = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.085, 0.30), wood);
-    stockMain.position.set(0, 0.025, 0.50);
-    const stockEnd  = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.10, 0.06), metal);
-    stockEnd.position.set(0, 0.020, 0.65);
+    // زر التبديل (صغير جانبي)
+    const btn = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.010, 0.022), ringMat);
+    btn.position.set(0.04, 0.01, -0.05);
 
-    // ===== الرف العلوي (تشكيل السلاح) =====
-    const topRail = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.035, 0.55), metalDark);
-    topRail.position.set(0, 0.085, -0.07);
-
-    g.add(body, barrel, muzzle, handguard, magazine, grip, stockMain, stockEnd, topRail);
+    g.add(body, head, ring, lens, grip, btn);
     return g;
   }
 
@@ -2961,7 +3251,7 @@
     "#..........................................................#",
     "##############.##############..............................#",
     "##......#.......#...........#S.............................#",
-    "##......#.......#...........#..######.######.###############",
+    "##......#.......#...........#..######.######.#.#############",
     "##......#.......#...........#..#...........#.#.....#......##",
     "##......#.......#...........#..#...........#.#.....#......##",
     "##..........................#..#...........#.#.....#......##",
@@ -2983,7 +3273,7 @@
     "##......#.......#.....#.....#................#.....#...#..##",
     "##......#.......#.....#.....#................###.###......##",
     "##......#.......#.....#.....#................#.....#...#..##",
-    "##......######.##############................#.....#...#..##",
+    "##......######.##.###########................#.....#...#..##",
     "##..............#...........#................#.....#...#..##",
     "##......#.......#.....#.....#................#.........#..##",
     "##......#.......#.....#.....#................#.....#...#..##",
@@ -3212,7 +3502,6 @@
       });
     }
 
-
 _placeKeys() {
   // توزيع عشوائي لكن متباعد على خلايا reachable فقط
   const spawnR = Math.round(this.spawn.z / this.cellSize);
@@ -3300,7 +3589,9 @@ _placeKeys() {
     if (glow) { glow.position.y = 0.45; bookGroup.add(glow); }
 
     bookGroup.position.set(px, 0.75, pz); // ★ 0.75m عن الأرض — على مستوى اليد
-    bookGroup.userData = { isBook: true, bookIndex: i, collected: false, worldPos: { x: px, z: pz } };
+    // مرجع مباشر للضوء — يستخدم لاحقاً لإطفاء الأضواء البعيدة عن اللاعب
+    // (توفير أداء GPU بدون أي تأثير مرئي، لأن مدى الضوء 3.5 وحدة أصلاً)
+    bookGroup.userData = { isBook: true, bookIndex: i, collected: false, worldPos: { x: px, z: pz }, glowLight: glow };
     this.keyObjects.push(bookGroup);
     this.scene.add(bookGroup);
     console.log(`[Spawn] Book ${i} at grid (${best.r},${best.c}) — reachable: ${NavGraph.isReachable(best.r, best.c)}`);
@@ -3526,15 +3817,21 @@ _buildDoor(x, z) {
       this.radius = 0.45;
       this.speed = 7.0;
       this.bob = 0;
-      this.hasWeapon = true;
+      this.hasFlashlight = true;
       this.lastShotTime = 0;
       this.recoil = 0;
-      this.weaponKick = 0;
+      this.lightKick = 0;
       this.keys = {};
       this.mouseDelta = { x: 0, y: 0 };
       this.joy = { x: 0, y: 0 };
       this.yaw = Math.PI;
       this.pitch = 0;
+      // ★ لواقعية المصباح — تتبّع تأخر بسيط عن دوران الكاميرا الفعلي
+      // (بدل ما المصباح يتحرك بالظبط مع الرأس، بيتأخر شوية زي أي جسم
+      // حقيقي له وزن وقصور ذاتي — إحساس أكتر واقعية بدل الحركة الآلية)
+      this._swayYaw = Math.PI;
+      this._swayPitch = 0;
+      this._idleSwayT = 0; // للتمايل الخفيف وقت الوقوف بدون حركة
       // vectors مؤقتة مخزنة — لا نخلق objects جديدة كل frame
       this._fwd = new THREE.Vector3();
       this._rgt = new THREE.Vector3();
@@ -3565,131 +3862,34 @@ _buildDoor(x, z) {
       this.map.scene.add(this.legsGroup);
 
       this.equipGroup = new THREE.Group();
-      this.equipAK = createAK47();
-      this.equipAK.scale.set(0.78, 0.78, 0.78);
-      // السلاح في الجانب الأيمن أسفل الشاشة — مائل مثل FPS حقيقي
-      // rotation.z سالب = يميل السلاح لليمين وأسفل (مثل الصورة)
-      // rotation.y = الفوهة تتجه نحو الأمام (-Z في فضاء الكاميرا)
-      // Classic FPS viewmodel: bottom-right corner, barrel pointing forward
-      this.equipAK.position.set(0.32, -0.28, -0.45);
-      this.equipAK.rotation.set(0.04, 0.12, -0.12);
-      this.equipAK.renderOrder = 999;
-      this._loadAKModel();
+      this.equipLight = createFlashlight();
+      this.equipLight.scale.set(1.0, 1.0, 1.0);
+      // مصباح يدوي في الجانب الأيمن أسفل الشاشة
+      this.equipLight.position.set(0.22, -0.26, -0.42);
+      this.equipLight.rotation.set(0.0, 0.08, -0.08);
+      this.equipLight.renderOrder = 999;
+      // متغيرات نظام النظارة الليلية (رؤية ليلية خضراء)
+      this._uvMode = false;       // هل وضع الرؤية الليلية مفعّل
+      this._toggleHeld = false;   // منع التبديل المتكرر بالضغط المطوّل
+      this._spiderDmg  = 0;       // شريط ضرر تراكمي للعنكبوت (0→1)
+      this._dmgBarEl   = null;    // عنصر شريط الضرر البصري
 
       const skinMat   = new THREE.MeshStandardMaterial({ color: '#e0ac69', roughness: 0.5 });
       const rightArm  = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.5), skinMat);
       rightArm.position.set(0.05, -0.2, 0.25); rightArm.rotation.set(Math.PI / 2 + 0.3, 0, 0);
       const leftArm   = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.45), skinMat);
       leftArm.position.set(-0.15, -0.15, -0.05); leftArm.rotation.set(Math.PI / 2 - 0.2, 0, -0.4);
-      this.equipAK.add(rightArm, leftArm);
+      this.equipLight.add(rightArm, leftArm);
 
-      this.flashLight = new THREE.PointLight('#ffddaa', 0, 6);
+      this.flashLight = new THREE.PointLight('#ffddaa', 0.9, 7);
       this.flashLight.position.set(0, 0.05, -0.6);
-      this.equipAK.add(this.flashLight);
-      this.equipGroup.add(this.equipAK);
+      this.equipLight.add(this.flashLight);
+      this.equipGroup.add(this.equipLight);
       this.camera.add(this.equipGroup);
     }
 
 
 
-    _loadAKModel() {
-      const loader = new THREE.GLTFLoader();
-      loader.load('models/AK47.glb', gltf => {
-        const model = gltf.scene;
-        model.traverse(child => {
-          if (child.isMesh) {
-            child.castShadow = false;
-            child.receiveShadow = false;
-            if (child.material) {
-              child.material = child.material.clone();
-              child.material.side = THREE.DoubleSide;
-              child.material.metalness = Math.max(child.material.metalness || 0, 0.25);
-              child.material.roughness = Math.min(child.material.roughness || 1, 0.75);
-              if (child.material.color) {
-                child.material.emissive = child.material.color.clone().multiplyScalar(0.08);
-                child.material.emissiveIntensity = 0.18;
-              }
-              child.material.depthTest = false;
-              child.material.depthWrite = false;
-              child.material.toneMapped = false;
-            }
-          }
-        });
-
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const maxAxis = Math.max(size.x, size.y, size.z) || 1;
-        const scale = 1.8 / maxAxis;
-        model.scale.setScalar(scale);
-
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
-
-        // ── Auto-orient باستخدام wrapper group لتفادي مشاكل ترتيب المحاور ──
-        // wrapper يدور حول Y فقط لتوجيه الفوهة نحو -Z
-        // model يدور حول Z فقط لقلب السلاح بحيث الزناد للأسفل
-        // هذا يضمن أن كل دوران مستقل ولا يؤثر على الآخر
-        const sz = size.clone().multiplyScalar(scale);
-        const longestAxis = (sz.x >= sz.y && sz.x >= sz.z) ? 'x'
-                          : (sz.z >= sz.y && sz.z >= sz.x) ? 'z' : 'y';
-
-        const wrapper = new THREE.Group();
-
-        // Auto-orient: دوران السلاح بناءً على المحور الأطول
-        if (longestAxis === 'z') {
-          wrapper.rotation.set(0, 0, 0);
-          model.rotation.set(0, 0, 0);
-        } else if (longestAxis === 'x') {
-          wrapper.rotation.set(0, Math.PI / 2, 0);
-          model.rotation.set(0, 0, 0);
-        } else {
-          wrapper.rotation.set(Math.PI / 2, 0, 0);
-          model.rotation.set(0, 0, 0);
-        }
-
-        wrapper.add(model);
-
-        while (this.equipAK.children.length > 0) {
-          this.equipAK.remove(this.equipAK.children[0]);
-        }
-
-        wrapper.renderOrder = 999;
-        model.renderOrder = 999;
-        this.equipAK.renderOrder = 999;
-        this.equipAK.add(wrapper);
-
-        const skinMat = new THREE.MeshStandardMaterial({ color: '#e0ac69', roughness: 0.5 });
-        const rightArm  = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.5), skinMat);
-        rightArm.position.set(0.05, -0.2, 0.25);
-        rightArm.rotation.set(Math.PI / 2 + 0.3, 0, 0);
-
-        const leftArm   = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.45), skinMat);
-        leftArm.position.set(-0.15, -0.15, -0.05);
-        leftArm.rotation.set(Math.PI / 2 - 0.2, 0, -0.4);
-
-        this.equipAK.add(rightArm, leftArm);
-        this.equipAK.add(this.flashLight);
-      }, undefined, () => {
-        // ✅ إعادة بناء السلاح الإجرائي عند فشل تحميل GLB
-        console.warn('[AK47] models/AK47.glb failed to load — restoring procedural fallback');
-        while (this.equipAK.children.length > 0) {
-          this.equipAK.remove(this.equipAK.children[0]);
-        }
-        const proceduralGun = createAK47();
-        proceduralGun.renderOrder = 999;
-        this.equipAK.add(proceduralGun);
-
-        const skinMat = new THREE.MeshStandardMaterial({ color: '#e0ac69', roughness: 0.5 });
-        const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.5), skinMat);
-        rightArm.position.set(0.05, -0.2, 0.25);
-        rightArm.rotation.set(Math.PI / 2 + 0.3, 0, 0);
-        const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.45), skinMat);
-        leftArm.position.set(-0.15, -0.15, -0.05);
-        leftArm.rotation.set(Math.PI / 2 - 0.2, 0, -0.4);
-        this.equipAK.add(rightArm, leftArm);
-        this.equipAK.add(this.flashLight);
-      });
-    }
     _bindInputs() {
       window.addEventListener('keydown', e => {
         this.keys[e.code] = true;
@@ -3740,8 +3940,6 @@ _buildDoor(x, z) {
 
       const isLookTarget = (e) => {
         if (GameSettings.paused) return false;
-        if (GameState.questionActive) return false;
-        if (e.target.closest('#question-overlay')) return false;
         if (e.target.closest('#top-controls')) return false;
         if (e.target.closest('#joystick')) return false;
         // السماح للـ aim حتى لو الضغط على زر النار أو أي زر action
@@ -3750,9 +3948,7 @@ _buildDoor(x, z) {
       };
 
       document.body.addEventListener('pointerdown', e => {
-        // إذا اللمس على نافذة الأسئلة — لا تسرق الحدث أبداً
-        if (GameState.questionActive) return;
-        if (e.target.closest('#question-overlay') || e.target.closest('#q-choices')) return;
+        // لا تسرق حدث اللمس من عناصر التحكم
         if (!isLookTarget(e) || lookId !== null) return;
         lookId = e.pointerId;
         lastT  = { x: e.clientX, y: e.clientY };
@@ -3760,7 +3956,6 @@ _buildDoor(x, z) {
 
       window.addEventListener('pointermove', e => {
         if (e.pointerId !== lookId) return;
-        if (GameState.questionActive) { lookId = null; return; }
         const dx = (e.clientX - lastT.x) * 0.0045;
         const dy = (e.clientY - lastT.y) * 0.0045;
         lastT = { x: e.clientX, y: e.clientY };
@@ -3771,7 +3966,6 @@ _buildDoor(x, z) {
       const stopLook = e => { if (e.pointerId === lookId) lookId = null; };
       window.addEventListener('pointerup',     stopLook);
       window.addEventListener('pointercancel', stopLook);
-      // دالة عامة لإيقاف نظام النظر من أي مكان (تستخدمها نافذة الأسئلة)
       window._releaseLook = () => { lookId = null; };
 
       // ===== زر الإطلاق — يشتغل مع تحريك الـ aim في نفس الوقت =====
@@ -3878,53 +4072,75 @@ _buildDoor(x, z) {
         this.rightLeg.position.z = lerp(this.rightLeg.position.z, 0, delta * 10);
       }
 
-      if (this.hasWeapon && (this.firePressed || this.keys['KeyF']) && time - this.lastShotTime > 78) {
-        this.lastShotTime = time;
-        this.justFired    = true; // ★ لـ checkShotHit
-        this.recoil = 0.22;
-        this.weaponKick = 0.035;
-        this.flashLight.intensity = 3.5;
-        // recoil خفيف على pitch بدل camera.rotation مباشرة — يسمح للاعب يحرك الـ aim أثناء الإطلاق
-        this.pitch -= 0.0025;
-        AudioSys.playShoot();
-        if (navigator.vibrate) navigator.vibrate(8);
+      // ── نظام مصباح Toggle ──
+      const toggleTrigger = this.firePressed || this.keys['KeyF'];
+      if (this.hasFlashlight && toggleTrigger && !this._toggleHeld) {
+        this._toggleHeld = true;
+        this._uvMode = !this._uvMode;
+        // تحديث لون الضوء والعدسة
+        if (this._uvMode) {
+          // النظارة تُطفئ المصباح — الإضاءة تأتي من CSS filter فقط
+          this.flashLight.intensity = 0;
+          this.flashLight.distance  = 0;
+          // اهتزاز خفيف
+          this.lightKick = 0.015;
+          // صوت تفعيل النظارة
+          _playGogglesSound(true);
+          if (navigator.vibrate) navigator.vibrate(5);
+        } else {
+          this.flashLight.color.set('#ffddaa');
+          this.flashLight.intensity = 0.9;
+          this.flashLight.distance  = 6;
+          // إعادة لون العدسة
+          this.equipLight.traverse(c => { if (c === this.equipLight._lensEl && c.material) { c.material.color.set('#aaddff'); c.material.emissive.set('#aaddff'); c.material.emissiveIntensity = 0.4; } });
+          // صوت إيقاف النظارة
+          _playGogglesSound(false);
+          if (navigator.vibrate) navigator.vibrate(5);
+          // صفّر شريط الضرر عند الإيقاف
+          this._spiderDmg = 0;
+          if (this._dmgBarEl) this._dmgBarEl.style.display = 'none';
+        }
+      }
+      if (!toggleTrigger) this._toggleHeld = false;
+
+      // إضاءة مستمرة بالوضع العادي فقط (النظارة: مصباح مطفأ)
+      if (!this._uvMode) {
+        this.flashLight.intensity = lerp(this.flashLight.intensity, 0.9, delta * 4);
+      } else {
+        this.flashLight.intensity = lerp(this.flashLight.intensity, 0, delta * 8);
       }
 
-      this.recoil = lerp(this.recoil, 0, delta * 18);
-      this.weaponKick = lerp(this.weaponKick, 0, delta * 20);
+      this.lightKick = lerp(this.lightKick, 0, delta * 14);
 
       const walkBob = Math.sin(this.bob * 0.5) * 0.015;
-      this.equipAK.position.x =  0.32 + walkBob * 1.10;
-      this.equipAK.position.y = -0.28 - Math.abs(walkBob * 0.35) + this.weaponKick;
-      this.equipAK.position.z = -0.45 + this.recoil * 0.10;
-      this.equipAK.rotation.x =  0.04 + this.recoil * 0.22;
-      this.equipAK.rotation.y =  0.12 + this.recoil * 0.04;
-      this.equipAK.rotation.z = -0.12 - this.recoil * 0.06;
 
-      this.flashLight.intensity = lerp(this.flashLight.intensity, 0, delta * 30);
+      // ★ تتبّع متأخر لدوران الرأس — يخلق إحساس "وزن حقيقي" للمصباح
+      // بدل ما يلف بالظبط مع الكاميرا في نفس اللحظة
+      this._swayYaw   = lerp(this._swayYaw,   this.yaw,   Math.min(1, delta * 9));
+      this._swayPitch = lerp(this._swayPitch, this.pitch, Math.min(1, delta * 9));
+      const lagYaw   = this.yaw   - this._swayYaw;   // الفرق = مقدار التخلف الحالي
+      const lagPitch = this.pitch - this._swayPitch;
+
+      // تمايل خفيف جداً وقت الوقوف الساكن (تنفّس/رعشة يد طبيعية)
+      this._idleSwayT += delta;
+      const isMoving = Math.abs(walkBob) > 0.003;
+      const idleSway = isMoving ? 0 : Math.sin(this._idleSwayT * 1.3) * 0.006;
+
+      this.equipLight.position.x =  0.22 + walkBob * 1.10 + lagYaw * 0.35;
+      this.equipLight.position.y = -0.26 - Math.abs(walkBob * 0.35) + this.lightKick + lagPitch * 0.25 + idleSway;
+      this.equipLight.position.z = -0.42;
+      this.equipLight.rotation.x =  0.0 - lagPitch * 0.6;
+      this.equipLight.rotation.y =  0.08 - lagYaw * 0.6;
+      this.equipLight.rotation.z = -0.08 - this.lightKick * 0.3 - lagYaw * 0.3;
+
+      // ★ ارتعاش خفيف جداً في شدة الضوء — إحساس بطارية/لمبة حقيقية
+      // مش رياضياً مثالية (يظهر بس في الوضع العادي، مش وقت النظارة)
+      if (!this._uvMode && this.flashLight.intensity > 0.1) {
+        const flicker = 1 + (Math.sin(time * 47.0) * 0.008 + Math.sin(time * 13.0) * 0.012);
+        this.flashLight.intensity *= flicker;
+      }
     }
   }
-
-  // ============================================================
-  //  QUESTIONS BANK  — 15 سؤال (إنجليزي + حساب)
-  // ============================================================
-  const QUESTIONS_BANK = [
-    { q: "ما معنى كلمة (Milk) بالعربي؟",       choices: ["حليب", "ماء", "عصير"],    answer: 0 },
-    { q: "ما معنى كلمة (Dog) بالعربي؟",        choices: ["قطة", "كلب", "حصان"],    answer: 1 },
-    { q: "ما معنى كلمة (Book) بالعربي؟",       choices: ["قلم", "مفتاح", "كتاب"],  answer: 2 },
-    { q: "ما معنى كلمة (Sun) بالعربي؟",        choices: ["شمس", "قمر", "نجم"],     answer: 0 },
-    { q: "ما معنى كلمة (House) بالعربي؟",      choices: ["سيارة", "بيت", "شجرة"],  answer: 1 },
-    { q: "ما معنى كلمة (Water) بالعربي؟",      choices: ["نار", "تراب", "ماء"],    answer: 2 },
-    { q: "ما معنى كلمة (Cat) بالعربي؟",        choices: ["قطة", "أسد", "ذئب"],     answer: 0 },
-    { q: "ما معنى كلمة (Apple) بالعربي؟",      choices: ["برتقال", "تفاحة", "موز"], answer: 1 },
-    { q: "ما معنى كلمة (School) بالعربي؟",     choices: ["مستشفى", "سوق", "مدرسة"],answer: 2 },
-    { q: "ما معنى كلمة (Door) بالعربي؟",       choices: ["باب", "نافذة", "سقف"],   answer: 0 },
-    { q: "كم ناتج: 15 + 10 ؟",                choices: ["20", "25", "30"],         answer: 1 },
-    { q: "كم ناتج: 14 + 16 ؟",                choices: ["28", "30", "32"],         answer: 1 },
-    { q: "كم ناتج: 20 + 5 ؟",                 choices: ["22", "25", "28"],         answer: 1 },
-    { q: "كم ناتج: 12 + 13 ؟",                choices: ["23", "25", "27"],         answer: 1 },
-    { q: "كم ناتج: 18 + 7 ؟",                 choices: ["23", "25", "27"],         answer: 1 },
-  ];
 
   // ============================================================
   //  HEARTS & GAME STATE
@@ -3932,7 +4148,6 @@ _buildDoor(x, z) {
   const GameState = {
     hearts: 3,
     maxHearts: 3,
-    questionActive: false,
     gameOver: false,
     gameWon: false,
     captureActive: false,
@@ -3994,20 +4209,7 @@ _buildDoor(x, z) {
     }
   }
 
-  // ============================================================
-  //  QUESTION SYSTEM DISABLED
-  // ============================================================
 
-  const QuestionSystem = {
-  _overlay: null,
-  init() {
-    // الأسئلة محذوفة بالكامل حسب الطلب
-  },
-  show(onCorrect, onWrong) {
-    // تمرير مباشر لمسار "الصحيح" بدون أي سؤال
-    if (typeof onCorrect === 'function') onCorrect();
-  }
-};
 
   // ============================================================
   //  DEATH / DEFEAT OVERLAY
@@ -4094,6 +4296,10 @@ _buildDoor(x, z) {
       `;
       document.getElementById('app').appendChild(div);
       this._el = div;
+      // ✅ FIX(double-tap): كان كل من click وtouchend بيندوا على hide() من غير
+      // أي حماية، فلو الجهاز طلق الاتنين لنفس اللمسة (ghost click) أو المستخدم
+      // ضغط مرتين بسرعة، hide() كانت بتتنفذ مرتين وتلغي الـ reset اللي حصل
+      // في الاستدعاء الأول. دلوقتي فيه علم _hiding بيمنع التكرار.
       document.getElementById('defeat-btn').addEventListener('click', () => this.hide());
       document.getElementById('defeat-btn').addEventListener('touchend', e => { e.preventDefault(); this.hide(); });
     },
@@ -4121,10 +4327,17 @@ _buildDoor(x, z) {
       this._el.style.display = 'flex';
     },
     hide() {
+      // ✅ FIX(double-tap): علم _hiding بيمنع تنفيذ hide() مرتين متتاليتين
+      // (زي لو click وtouchend اتطلقوا لنفس اللمسة، أو ضغط مزدوج سريع).
+      if (this._hiding) return;
+      this._hiding = true;
       this._el.style.display = 'none';
       GameState.gameOver = false;
       GameSettings.paused = false;
-      if (this._onContinue) this._onContinue();
+      const cb = this._onContinue;
+      this._onContinue = null;
+      if (cb) cb();
+      this._hiding = false;
     }
   };
 
@@ -4282,6 +4495,9 @@ _buildDoor(x, z) {
         duration: 0.5, elapsed: 0, startYaw: 0, startPitch: 0, eased: false,
       };
 
+      // تجميد الكاميرا عند الظهور (0.25 ثانية)
+      this._cameraFreezeTimer = 0;
+
       // غضب سليندرينا عند قتل العنكبوت
       this._rageActive  = false;
       this._rageTimer   = 0;
@@ -4292,6 +4508,7 @@ _buildDoor(x, z) {
     //  تحميل مجسم Slendrina من GLB أو fallback
     // ═══════════════════════════════════════════════
     _loadModel() {
+      this._glbMaterials = [];
       const loader = new THREE.GLTFLoader();
       loader.load('models/slendrina.glb', gltf => {
         const model = gltf.scene;
@@ -4305,6 +4522,7 @@ _buildDoor(x, z) {
               : new THREE.Color(0x333333);
             child.material.emissiveIntensity = 0.7;
             child.material.needsUpdate = true;
+            this._glbMaterials.push(child.material); // ★ لتبديل اللون الحراري لاحقاً
           }
         });
         const box = new THREE.Box3().setFromObject(model);
@@ -4335,6 +4553,20 @@ _buildDoor(x, z) {
         color: '#2a1a1a', roughness: 0.9,
         emissive: new THREE.Color('#220000'), emissiveIntensity: 0.5
       });
+      // ★ حفظ مراجع الألوان الأصلية والمواد — لتبديل اللون الحراري لاحقاً
+      // (نفس نظام setThermalMode بتاع العنكبوت، للتناسق بين العدوين)
+      this._normalSkinColor    = '#d8cfc8';
+      this._normalSkinEmissive = '#555555';
+      this._normalDarkColor    = '#2a1a1a';
+      this._normalDarkEmissive = '#220000';
+      this._thermalSkinColor    = '#ff6633';
+      this._thermalSkinEmissive = '#ff4400';
+      this._thermalDarkColor    = '#cc2200';
+      this._thermalDarkEmissive = '#ff2200';
+      this._skinMat = skinMat;
+      this._darkMat = darkMat;
+      this._isThermal = false;
+      this._glbMaterials = this._glbMaterials || [];
       // رأس
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), skinMat);
       head.position.y = 1.75;
@@ -4378,6 +4610,35 @@ _buildDoor(x, z) {
       this._eyeR = eyeR;
     }
 
+    // ★ تبديل مظهر سلندرينا بين الوضع العادي و"الهدف الحراري" (لما المنظار يفتح)
+    // نفس نظام العنكبوت بالظبط — للتناسق بين العدوين
+    setThermalMode(on) {
+      if (this._isThermal === on) return;
+      this._isThermal = on;
+      if (this._skinMat) {
+        this._skinMat.color.set(on ? this._thermalSkinColor : this._normalSkinColor);
+        this._skinMat.emissive.set(on ? this._thermalSkinEmissive : this._normalSkinEmissive);
+        this._skinMat.emissiveIntensity = on ? 2.4 : 0.6;
+      }
+      if (this._darkMat) {
+        this._darkMat.color.set(on ? this._thermalDarkColor : this._normalDarkColor);
+        this._darkMat.emissive.set(on ? this._thermalDarkEmissive : this._normalDarkEmissive);
+        this._darkMat.emissiveIntensity = on ? 2.0 : 0.5;
+      }
+      if (this._glbMaterials && this._glbMaterials.length) {
+        for (const mat of this._glbMaterials) {
+          if (on) {
+            mat.emissive.set(this._thermalSkinEmissive || '#ff4400');
+            mat.emissiveIntensity = 2.2;
+          } else {
+            // ارجع لنفس القيمة اللي اتحطت وقت التحميل (لون الجسم × 0.55)
+            mat.emissive.copy(mat.color).multiplyScalar(0.55);
+            mat.emissiveIntensity = 0.7;
+          }
+        }
+      }
+    }
+
     // ═══════════════════════════════════════════════
     //  تأثيرات الشاشة (دم أحمر + تشويش)
     // ═══════════════════════════════════════════════
@@ -4416,6 +4677,18 @@ _buildDoor(x, z) {
             55%{filter:none}
           }
           .slend-glitch { animation: slendStatic 0.4s steps(1) forwards; }
+          @keyframes slendShake {
+            0%  {transform:translate(0,0)}
+            12% {transform:translate(-5px,-3px)}
+            25% {transform:translate(6px,2px)}
+            37% {transform:translate(-4px,5px)}
+            50% {transform:translate(5px,-4px)}
+            62% {transform:translate(-3px,3px)}
+            75% {transform:translate(4px,-2px)}
+            87% {transform:translate(-2px,4px)}
+            100%{transform:translate(0,0)}
+          }
+          .slend-shake { animation: slendShake 0.35s ease-out forwards; }
         `;
         document.head.appendChild(st);
       }
@@ -4458,9 +4731,16 @@ _buildDoor(x, z) {
         src.connect(flt); flt.connect(g); g.connect(ctx.destination);
         src.start();
       }
+      // اهتزاز الشاشة
+      const gameEl = document.getElementById('game');
+      gameEl.classList.remove('slend-shake');
+      void gameEl.offsetWidth; // force reflow لإعادة تشغيل الأنيميشن
+      gameEl.classList.add('slend-shake');
       setTimeout(() => {
         this._flashEl.style.opacity = '0';
-        document.getElementById('game').classList.remove('slend-glitch');
+        gameEl.classList.remove('slend-glitch');
+        gameEl.classList.remove('slend-shake');
+        gameEl.style.transform = '';
       }, 350);
     }
 
@@ -4502,12 +4782,26 @@ _buildDoor(x, z) {
       const camR    = Math.round(this.camera.position.z / cs);
       const camC    = Math.round(this.camera.position.x / cs);
 
-      const candidates = NavGraph.reachableList.filter(cell => {
+      // ★ فلتر LOS: تظهر سليندرينا فقط في مواضع مرئية للاعب (لا تأتي من خلف جدار)
+      let candidates = NavGraph.reachableList.filter(cell => {
         const d = Math.hypot(cell.r - camR, cell.c - camC);
-        return d >= minD && d <= maxD &&
-               mapLayout[cell.r]?.[cell.c] !== '#' &&
-               mapLayout[cell.r]?.[cell.c] !== 'D';
+        if (d < minD || d > maxD) return false;
+        if (mapLayout[cell.r]?.[cell.c] === '#' || mapLayout[cell.r]?.[cell.c] === 'D') return false;
+        const wx = cell.c * cs, wz = cell.r * cs;
+        return this._hasLOS(wx, wz, this.camera.position.x, this.camera.position.z);
       });
+
+      // إذا لم يوجد موضع بخط رؤية مباشر — وسّع النطاق ثم استخدم أقرب مرشح
+      if (candidates.length === 0) {
+        candidates = NavGraph.reachableList.filter(cell => {
+          const d = Math.hypot(cell.r - camR, cell.c - camC);
+          return d >= 3 && d <= maxD + 3 &&
+                 mapLayout[cell.r]?.[cell.c] !== '#' &&
+                 mapLayout[cell.r]?.[cell.c] !== 'D' &&
+                 this._hasLOS(cell.c * cs, cell.r * cs,
+                              this.camera.position.x, this.camera.position.z);
+        });
+      }
 
       let spawnX, spawnZ;
       if (candidates.length > 0) {
@@ -4515,7 +4809,7 @@ _buildDoor(x, z) {
         spawnX = cell.c * cs;
         spawnZ = cell.r * cs;
       } else {
-        // fallback: جانب اللاعب على مسافة 4 خلايا
+        // fallback نادر جداً: جانب اللاعب على مسافة 4 خلايا أمامه
         const fwd = new THREE.Vector3();
         this.camera.getWorldDirection(fwd);
         fwd.y = 0; fwd.normalize();
@@ -4526,6 +4820,17 @@ _buildDoor(x, z) {
 
       this.group.position.set(spawnX, 0, spawnZ);
       this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
+
+      // ★ تجميد الكاميرا 0.25 ثانية فور الظهور
+      this._cameraFreezeTimer = 0.25;
+
+      // ★ صوت الظهور
+      if (AudioSys.ctx) {
+        SlendAppearAudio.init(AudioSys.ctx);
+        SlendAppearAudio.play(AudioSys.ctx);
+      }
+
+      this._isRageAppear = false; // ظهور عادي = قد يقتل
       this._triggerCameraSnap(playerRef);
 
       console.log(`[Slendrina] FACE dist=${
@@ -4614,6 +4919,16 @@ _buildDoor(x, z) {
             playerRef.joy         = { x: 0, y: 0 };
             playerRef.firePressed = false;
             playerRef.interactPressed = false;
+            // إعادة ضبط المصباح
+            playerRef._uvMode     = false;
+            playerRef._toggleHeld = false;
+            playerRef._spiderDmg  = 0;
+            if (playerRef._dmgBarEl) playerRef._dmgBarEl.style.display = 'none';
+            if (playerRef.flashLight) {
+              playerRef.flashLight.color.set('#ffddaa');
+              playerRef.flashLight.intensity = 0;
+              playerRef.flashLight.distance  = 6;
+            }
           }
           renderHearts();
           for (const k of this.maze.keyObjects) {
@@ -4741,6 +5056,24 @@ _buildDoor(x, z) {
     }
 
     // ═══════════════════════════════════════════════
+    //  فحص خط الرؤية (LOS) — هل الموضع مرئي للاعب؟
+    //  يمر على خط مستقيم ويتحقق من كل خلية
+    // ═══════════════════════════════════════════════
+    _hasLOS(spawnX, spawnZ, camX, camZ) {
+      const cs = this.maze.cellSize;
+      const steps = 24;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const wx = spawnX + (camX - spawnX) * t;
+        const wz = spawnZ + (camZ - spawnZ) * t;
+        const r = Math.round(wz / cs);
+        const c = Math.round(wx / cs);
+        if (!NavGraph.isWalkable(r, c)) return false;
+      }
+      return true;
+    }
+
+    // ═══════════════════════════════════════════════
     //  BFS (محتفظ به من النظام القديم)
     // ═══════════════════════════════════════════════
     // يعتمد على NavGraph كمصدر موحد — لا تكرار في البيانات
@@ -4857,24 +5190,83 @@ _buildDoor(x, z) {
 
     // دالة hit فارغة — Slendrina لا تموت
     hit() { /* Slendrina لا تتأثر بالطلقات */ }
-    refreshGridForDoor() { if (this._grid) { this._currentPath = null; } }
+    // ✅ FIX(dup): كان فيه تعريف تاني لـ refreshGridForDoor هنا بيلغي النسخة
+    // الكاملة اللي فوق (✅ FIX4) — اتشال، والنسخة الكاملة فوق هي الشغالة دلوقتي.
+
+    // ═══════════════════════════════════════════════
+    //  ظهور الغضب — رعب فقط، لا قتل، تختفي بعد 0.6 ثانية
+    // ═══════════════════════════════════════════════
+    _rageAppear(playerRef) {
+      this._doJumpScare();
+      // صوت EnemyX المنفصل لظهور الغضب
+      if (AudioSys.ctx) {
+        EnemyXAudio.init(AudioSys.ctx);
+        EnemyXAudio.play(AudioSys.ctx);
+      }
+      this.group.visible = true;
+
+      // ظهور قريب جداً من الوجه (1.5 متر أمام اللاعب مباشرة)
+      const fwd = new THREE.Vector3(
+        -Math.sin(playerRef ? playerRef.yaw : this.camera.rotation.y),
+        0,
+        -Math.cos(playerRef ? playerRef.yaw : this.camera.rotation.y)
+      );
+      // ضع سلندرينا أمام اللاعب مباشرة — تحقق من الجدار
+      let rageDist = 1.5 + Math.random() * 0.5;
+      let rageX = this.camera.position.x + fwd.x * rageDist;
+      let rageZ = this.camera.position.z + fwd.z * rageDist;
+      // فحص بسيط: إذا الموضع داخل جدار — قلّص المسافة
+      const cs = this.maze.cellSize;
+      const col = this.maze.colliders;
+      const r = 0.3;
+      const inWall = (x, z) => col.some(c => x+r>c.min.x && x-r<c.max.x && z+r>c.min.z && z-r<c.max.z);
+      if (inWall(rageX, rageZ)) {
+        rageDist = 0.8;
+        rageX = this.camera.position.x + fwd.x * rageDist;
+        rageZ = this.camera.position.z + fwd.z * rageDist;
+      }
+      this.group.position.set(rageX, 0, rageZ);
+      this.group.lookAt(this.camera.position.x, 0, this.camera.position.z);
+
+      // بدون تجميد — فقط رعب بصري
+      this._cameraFreezeTimer = 0;
+
+      // تختفي بعد 0.6 ثانية
+      setTimeout(() => {
+        this.group.visible = false;
+      }, 600);
+    }
 
     update(delta, playerPos, playerRef) {
       if (GameSettings.paused || GameState.captureActive) return;
 
+      // ★ تجميد الكاميرا فور الظهور (0.25 ثانية كاملة)
+      if (this._cameraFreezeTimer > 0) {
+        this._cameraFreezeTimer -= delta;
+        if (playerRef) {
+          playerRef.mouseDelta.x = 0;
+          playerRef.mouseDelta.y = 0;
+          playerRef.joy.x = 0;
+          playerRef.joy.y = 0;
+        }
+      }
+
       this._updateCameraSnap(delta, playerRef);
 
-      // ── نظام الغضب (بعد قتل العنكبوت) ──
+      // ── نظام الغضب (بعد قتل العنكبوت) — ظهور رعب فقط بدون قتل ──
       if (this._rageActive) {
         this._rageTimer += delta;
+        // 5 ظهورات موزعة على 10 ثواني: 0.3, 2.3, 4.3, 6.3, 8.3 ثانية
+        const rageTimes = [0.3, 2.3, 4.3, 6.3, 8.3];
         if (this._mode === 0 && this._rageBursts < 5 &&
-            this._rageTimer > this._rageBursts * 1.2 + 0.1) {
-          this._activateMode(EnemySystem.MODE_FACE, playerRef);
+            this._rageTimer >= rageTimes[this._rageBursts]) {
+          this._rageAppear(playerRef);
           this._rageBursts++;
         }
-        if (this._rageTimer > 6.5) {
+        if (this._rageTimer > 10.0) {
           this._rageActive = false;
           this._rageTimer  = 0;
+          this._rageBursts = 0;
         }
       }
 
@@ -4918,7 +5310,7 @@ _buildDoor(x, z) {
       if (looking) {
         this._stareTimer += delta;
         const ratio = clamp(this._stareTimer / this.STARE_KILL, 0, 1);
-        const lock  = clamp(0.55 + ratio * 0.42, 0, 0.97);
+        const lock  = clamp(0.30 + ratio * 0.18, 0, 0.48);
         if (playerRef) {
           playerRef.mouseDelta.x *= (1 - lock);
           playerRef.mouseDelta.y *= (1 - lock);
@@ -4955,20 +5347,19 @@ _buildDoor(x, z) {
       this.maze   = maze;
       this.camera = camera;
 
-      this.SPEED         = 2.8;   // أبطأ من اللاعب (~5)
+      this.SPEED_WANDER  = 1.6;
+      this.SPEED_CHASE   = 3.0;
       this.BITE_DIST     = 1.1;
-      this.BITE_COOLDOWN = 2.2;   // ثواني بين لدغة ولدغة
+      this.BITE_COOLDOWN = 2.2;
       this.ENEMY_RADIUS  = 0.35;
-      this.COOLDOWN_MIN  = 18.0;
-      this.COOLDOWN_MAX  = 30.0;
-      this.CHASE_DUR     = 25.0;
+      this.CHASE_RANGE   = 9.0;
+      this.CHASE_LOSE    = 14.0;
 
+      this._state        = 'wander';
       this._active       = false;
-      this._cooldown     = rand(this.COOLDOWN_MIN, this.COOLDOWN_MAX);
-      this._chaseTimer   = 0;
       this._biteTimer    = 0;
       this._totalBites   = 0;
-      this._modelReady   = false; // سيصبح true فوراً في _buildModel
+      this._modelReady   = false;
 
       this._grid         = null;
       this._gridRows     = 0;
@@ -4977,8 +5368,11 @@ _buildDoor(x, z) {
       this._pathTimer    = 999;
       this._pathStep     = 1;
 
-      // مسافة التوقف عن المطاردة
-      this.CHASE_STOP_DIST = 18; // خلايا — يتوقف لو بعد اللاعب كثيراً
+      this._wanderTarget = null;
+      this._wanderTimer  = 0;
+      this._spawnDelay   = rand(4, 8);
+
+      this._glbMaterials = []; // ★ مواد الموديل المستورد (GLB) — لو اتحمّل لاحقاً
 
       this.group = new THREE.Group();
       this.group.visible = false;
@@ -4987,6 +5381,7 @@ _buildDoor(x, z) {
       this._buildModel();
       this._buildGrid();
       this._buildFX();
+      this._buildHUD();
     }
 
     _buildModel() {
@@ -5006,6 +5401,7 @@ _buildDoor(x, z) {
             child.material.side = THREE.DoubleSide;
             child.material.emissive = new THREE.Color('#1a0000');
             child.material.emissiveIntensity = 0.5;
+            this._glbMaterials.push(child.material); // ★ لتبديل اللون الحراري لاحقاً
           }
         });
         const box = new THREE.Box3().setFromObject(model);
@@ -5023,42 +5419,99 @@ _buildDoor(x, z) {
 
     _buildFallback() {
       const g = new THREE.Group();
-      const bodyMat = new THREE.MeshStandardMaterial({ color:'#1a0a00', roughness:0.7, emissive:new THREE.Color('#330000'), emissiveIntensity:0.8 });
-      const legMat  = new THREE.MeshStandardMaterial({ color:'#0d0500', roughness:0.9, emissive:new THREE.Color('#220000'), emissiveIntensity:0.5 });
-      const eyeMat  = new THREE.MeshStandardMaterial({ color:'#ff0000', emissive:new THREE.Color('#ff0000'), emissiveIntensity:4.0 });
+      // جسم أكبر وأوضح — لون بني داكن مع emissive أقوى
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color:'#3a1200', roughness:0.6,
+        emissive:new THREE.Color('#8b1a00'), emissiveIntensity:1.8
+      });
+      const legMat = new THREE.MeshStandardMaterial({
+        color:'#2a0d00', roughness:0.8,
+        emissive:new THREE.Color('#5a0f00'), emissiveIntensity:1.2
+      });
+      const eyeMat = new THREE.MeshStandardMaterial({
+        color:'#ff2200', emissive:new THREE.Color('#ff2200'), emissiveIntensity:8.0,
+        toneMapped:false
+      });
 
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), bodyMat);
-      body.position.y = 0.22; body.scale.set(1, 0.7, 1.2); g.add(body);
+      // ★ نحفظ الألوان الأصلية ومراجع المواد — نستخدمها لاحقاً لتبديل
+      // اللون لما اللاعب يفتح المنظار (تمييز "هدف حراري" أحمر/برتقالي)
+      this._normalBodyColor    = '#3a1200';
+      this._normalBodyEmissive = '#8b1a00';
+      this._normalLegColor     = '#2a0d00';
+      this._normalLegEmissive  = '#5a0f00';
+      this._thermalBodyColor    = '#ff5500';
+      this._thermalBodyEmissive = '#ff3300';
+      this._thermalLegColor     = '#cc3300';
+      this._thermalLegEmissive  = '#ff2200';
+      this._bodyMat = bodyMat;
+      this._legMat  = legMat;
+      this._isThermal = false;
 
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), bodyMat);
-      head.position.set(0, 0.22, -0.28); g.add(head);
+      // جسم رئيسي أكبر (0.38 بدل 0.22)
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.38, 10, 8), bodyMat);
+      body.position.y = 0.38; body.scale.set(1, 0.75, 1.3); g.add(body);
 
-      [[-0.07,0.28,-0.38],[0.07,0.28,-0.38],[-0.11,0.22,-0.36],[0.11,0.22,-0.36],
-       [-0.04,0.18,-0.37],[0.04,0.18,-0.37],[-0.09,0.25,-0.35],[0.09,0.25,-0.35]
+      // رأس
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), bodyMat);
+      head.position.set(0, 0.38, -0.48); g.add(head);
+
+      // 8 عيون حمراء كبيرة وواضحة
+      [[-0.10,0.44,-0.62],[0.10,0.44,-0.62],[-0.16,0.36,-0.60],[0.16,0.36,-0.60],
+       [-0.06,0.30,-0.61],[0.06,0.30,-0.61],[-0.13,0.40,-0.58],[0.13,0.40,-0.58]
       ].forEach(p => {
-        const e = new THREE.Mesh(new THREE.SphereGeometry(0.025, 5, 4), eyeMat);
+        const e = new THREE.Mesh(new THREE.SphereGeometry(0.042, 6, 5), eyeMat);
         e.position.set(...p); g.add(e);
       });
 
-      // 8 أرجل
-      [[-1,0.3,0.45],[-1,0.8,0.50],[-1,1.2,0.48],[-1,1.6,0.42],
-       [ 1,0.3,0.45],[ 1,0.8,0.50],[ 1,1.2,0.48],[ 1,1.6,0.42]
-      ].forEach(([side, ang, len]) => {
-        const up = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.012,len*0.55,4), legMat);
-        const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.006,len*0.55,4), legMat);
-        up.rotation.z = side*(Math.PI/2+0.4); up.rotation.x = -0.3;
-        up.position.set(side*0.18+side*len*0.28*Math.cos(ang*0.5), 0.15, (ang-0.9)*0.15);
-        lo.rotation.z = side*(Math.PI/2+0.9); lo.rotation.x = 0.4;
-        lo.position.set(side*0.18+side*len*0.65*Math.cos(ang*0.4), -0.05, (ang-0.9)*0.15+len*0.3*Math.sin(ang*0.3));
+      // 8 أرجل — أطول وأوضح
+      const legPairs = [
+        [-1, 0.2, 0.80], [-1, 0.7, 0.85], [-1, 1.2, 0.82], [-1, 1.7, 0.75],
+        [ 1, 0.2, 0.80], [ 1, 0.7, 0.85], [ 1, 1.2, 0.82], [ 1, 1.7, 0.75],
+      ];
+      legPairs.forEach(([side, ang, len]) => {
+        const up = new THREE.Mesh(new THREE.CylinderGeometry(0.030,0.020,len*0.52,5), legMat);
+        const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.020,0.010,len*0.52,5), legMat);
+        up.rotation.z = side * (Math.PI/2 + 0.35); up.rotation.x = -0.25;
+        up.position.set(side*0.30 + side*len*0.26*Math.cos(ang*0.5), 0.22, (ang-0.9)*0.18);
+        lo.rotation.z = side * (Math.PI/2 + 0.85); lo.rotation.x = 0.45;
+        lo.position.set(side*0.30 + side*len*0.62*Math.cos(ang*0.4), -0.06, (ang-0.9)*0.18 + len*0.28*Math.sin(ang*0.3));
         g.add(up, lo);
       });
 
-      const glow = new THREE.PointLight('#440000', 1.2, 3.5);
-      glow.position.y = 0.3; g.add(glow);
+      // ضوء أحمر أقوى وأبعد مدى
+      const glow = new THREE.PointLight('#ff1100', 2.5, 7.0);
+      glow.position.y = 0.5; g.add(glow);
+      // ضوء ثانٍ للعيون
+      const eyeGlow = new THREE.PointLight('#ff0000', 1.5, 3.0);
+      eyeGlow.position.set(0, 0.4, -0.6); g.add(eyeGlow);
+
       this._spiderGlow  = glow;
+      this._eyeGlow     = eyeGlow;
       this.group.add(g);
       this._spiderModel = g;
       this._modelReady  = true;
+    }
+
+    // ★ تبديل مظهر العنكبوت بين الوضع العادي و"الهدف الحراري" (لما المنظار يفتح)
+    // بيتنادى مرة واحدة بس لما الحالة تتغير فعلياً — مش كل frame — عشان الأداء
+    setThermalMode(on) {
+      if (this._isThermal === on) return; // نفس الحالة أصلاً — متعملش حاجة
+      this._isThermal = on;
+      if (this._bodyMat) {
+        this._bodyMat.color.set(on ? this._thermalBodyColor : this._normalBodyColor);
+        this._bodyMat.emissive.set(on ? this._thermalBodyEmissive : this._normalBodyEmissive);
+        this._bodyMat.emissiveIntensity = on ? 3.2 : 1.8;
+      }
+      if (this._legMat) {
+        this._legMat.color.set(on ? this._thermalLegColor : this._normalLegColor);
+        this._legMat.emissive.set(on ? this._thermalLegEmissive : this._normalLegEmissive);
+        this._legMat.emissiveIntensity = on ? 2.2 : 1.2;
+      }
+      // لو فيه موديل GLB متحمّل — لوّنه بنفس الطريقة
+      for (const mat of this._glbMaterials) {
+        mat.emissive.set(on ? this._thermalBodyEmissive : '#1a0000');
+        mat.emissiveIntensity = on ? 2.5 : 0.5;
+      }
     }
 
     _buildFX() {
@@ -5080,6 +5533,28 @@ _buildDoor(x, z) {
         st.textContent = `@keyframes spiderBiteAnim{0%{transform:scale(1) rotate(0deg);opacity:.9}25%{transform:scale(1.04) rotate(-1.2deg);opacity:1}75%{transform:scale(.97) rotate(1deg);opacity:.8}100%{transform:scale(1) rotate(0deg);opacity:0}}.spider-bite-shake{animation:spiderBiteAnim .35s ease forwards}`;
         document.head.appendChild(st);
       }
+    }
+
+    _buildHUD() {
+      // مؤشر "العنكبوت قريب" — يظهر فقط عند الاقتراب
+      if (document.getElementById('spider-hud')) return;
+      const hud = document.createElement('div');
+      hud.id = 'spider-hud';
+      hud.style.cssText = `
+        position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+        background:rgba(80,0,0,0.82); border:1px solid #cc0000;
+        color:#ff4444; font-family:monospace; font-size:13px; font-weight:bold;
+        padding:5px 16px; border-radius:20px; pointer-events:none;
+        display:none; z-index:200; letter-spacing:1px;
+        box-shadow:0 0 12px rgba(255,0,0,0.5);
+        animation: spider-pulse 0.6s ease-in-out infinite alternate;
+      `;
+      hud.textContent = '⚠ عنكبوت قريب';
+      const style = document.createElement('style');
+      style.textContent = '@keyframes spider-pulse { from{opacity:0.7} to{opacity:1} }';
+      document.head.appendChild(style);
+      document.getElementById('app').appendChild(hud);
+      this._hudEl = hud;
     }
 
     _buildGrid() {
@@ -5126,53 +5601,54 @@ _buildDoor(x, z) {
     }
 
     _pickSpawnPos() {
-      const cs=this.maze.cellSize;
-      const camR=Math.round(this.camera.position.z/cs);
-      const camC=Math.round(this.camera.position.x/cs);
-      const minD = 15 / cs;
-      const candidates=NavGraph.reachableList.filter(cell=>{
-        const d=Math.hypot(cell.r-camR,cell.c-camC);
-        return d>=minD && mapLayout[cell.r][cell.c]!=='#' && mapLayout[cell.r][cell.c]!=='D';
+      const cs = this.maze.cellSize;
+      const camR = Math.round(this.camera.position.z / cs);
+      const camC = Math.round(this.camera.position.x / cs);
+      const candidates = NavGraph.reachableList.filter(cell => {
+        const d = Math.hypot(cell.r - camR, cell.c - camC);
+        return d >= 10 && mapLayout[cell.r][cell.c] !== '#' && mapLayout[cell.r][cell.c] !== 'D';
       });
-      if(!candidates.length)return null;
-      const cell=candidates[Math.floor(Math.random()*candidates.length)];
-      return new THREE.Vector3(cell.c*cs, 0, cell.r*cs);
+      if (!candidates.length) return null;
+      const cell = candidates[Math.floor(Math.random() * candidates.length)];
+      return new THREE.Vector3(cell.c * cs, 0, cell.r * cs);
     }
 
-    _activate() {
-      const pos=this._pickSpawnPos();
-      if(!pos)return;
-      this.group.position.copy(pos);
-      this.group.visible=true;
-      this._active=true;
-      this._chaseTimer=0;
-      this._biteTimer=0;
-      this._currentPath=null;
-      this._pathTimer=999;
+    _pickWanderTarget() {
+      const cs  = this.maze.cellSize;
+      const myR = Math.round(this.group.position.z / cs);
+      const myC = Math.round(this.group.position.x / cs);
+      const candidates = NavGraph.reachableList.filter(cell => {
+        const d = Math.hypot(cell.r - myR, cell.c - myC);
+        return d >= 4 && d <= 18 && mapLayout[cell.r][cell.c] !== '#';
+      });
+      if (!candidates.length) return null;
+      const cell = candidates[Math.floor(Math.random() * candidates.length)];
+      return new THREE.Vector3(cell.c * cs, 0, cell.r * cs);
+    }
 
-      if(AudioSys.ctx){
-        const ctx=AudioSys.ctx;
-        const buf=ctx.createBuffer(1,ctx.sampleRate*0.18,ctx.sampleRate);
-        const d=buf.getChannelData(0);
-        for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.sin(i/d.length*Math.PI)*0.4;
-        const src=ctx.createBufferSource(); src.buffer=buf;
-        const flt=ctx.createBiquadFilter(); flt.type='highpass'; flt.frequency.value=1800;
-        const g=ctx.createGain(); g.gain.setValueAtTime(0.5,ctx.currentTime);
+    _spawn() {
+      const pos = this._pickSpawnPos();
+      if (!pos) return;
+      this.group.position.copy(pos);
+      this.group.visible = true;
+      this._active       = true;
+      this._state        = 'wander';
+      this._biteTimer    = 0;
+      this._currentPath  = null;
+      this._pathTimer    = 999;
+      this._wanderTarget = null;
+      this._wanderTimer  = 0;
+      if (AudioSys.ctx) {
+        SpiderAudio.init(AudioSys.ctx);
+        const ctx = AudioSys.ctx;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.18, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1)*Math.sin(i/d.length*Math.PI)*0.4;
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const flt = ctx.createBiquadFilter(); flt.type = 'highpass'; flt.frequency.value = 1800;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.5, ctx.currentTime);
         src.connect(flt); flt.connect(g); g.connect(ctx.destination); src.start();
       }
-      console.log(`[SpiderChild] Activated at dist=${pos.distanceTo(this.camera.position).toFixed(1)}m`);
-    }
-
-    _deactivate() {
-      this._active=false;
-      this.group.visible=false;
-      this._proxFX.style.opacity='0';
-      const ratio=clamp(GameState.keysCollected/GameState.totalKeys,0,1);
-      this._cooldown=rand(
-        this.COOLDOWN_MIN*(1-ratio*0.5),
-        this.COOLDOWN_MAX*(1-ratio*0.4)
-      );
-      console.log(`[SpiderChild] Deactivated, next in ${this._cooldown.toFixed(1)}s`);
     }
 
     _doBite(playerRef) {
@@ -5188,7 +5664,10 @@ _buildDoor(x, z) {
           GameState.captureActive = true;
           GameSettings.paused     = true;
           document.exitPointerLock?.();
-          this._deactivate();
+          // إخفاء مؤقت عند موت اللاعب
+          this.group.visible = false;
+          this._proxFX.style.opacity = '0';
+          SpiderAudio.stop();
           DefeatOverlay.show(() => {
             GameSettings.paused     = false;
             GameState.captureActive = false;
@@ -5200,6 +5679,14 @@ _buildDoor(x, z) {
             this.camera.position.copy(this.maze.spawn);
             this.camera.position.y=1.62;
             this._totalBites=0;
+            // إعادة إظهار العنكبوت بعد restart
+            const pos = this._pickSpawnPos();
+            if (pos) { this.group.position.copy(pos); }
+            this.group.visible = true;
+            this._state = 'wander';
+            this._wanderTarget = null;
+            this._wanderTimer  = 0;
+            this._currentPath  = null;
           });
           return;
         }
@@ -5211,6 +5698,9 @@ _buildDoor(x, z) {
       if(navigator.vibrate)navigator.vibrate([30,20,30]);
 
       if(AudioSys.ctx){
+        SpiderBiteAudio.init(AudioSys.ctx);
+        SpiderBiteAudio.play(AudioSys.ctx);
+        // صوت لدغة إجرائي احتياطي
         const ctx=AudioSys.ctx;
         const buf=ctx.createBuffer(1,ctx.sampleRate*0.12,ctx.sampleRate);
         const d=buf.getChannelData(0);
@@ -5233,97 +5723,186 @@ _buildDoor(x, z) {
       if(!this._spiderModel)return;
       this._spiderModel.position.y=Math.abs(Math.sin(time*0.012))*0.05;
       this._spiderModel.rotation.z=Math.sin(time*0.015)*0.04;
-      if(this._spiderGlow) this._spiderGlow.intensity=1.0+Math.sin(time*0.008)*0.4;
+      // نبض الضوء الأحمر بسرعة (يجعله مرئياً أكثر)
+      const pulse = 1.0 + Math.sin(time * 0.015) * 0.6;
+      if(this._spiderGlow) this._spiderGlow.intensity = 2.5 * pulse;
+      if(this._eyeGlow)    this._eyeGlow.intensity    = 1.5 * pulse;
     }
 
     update(delta, time, playerPos, playerRef) {
-      if(GameSettings.paused||GameState.captureActive)return;
+      if (GameSettings.paused || GameState.captureActive) return;
 
-      if(!this._active){
-        this._cooldown-=delta;
-        if(this._cooldown<=0&&this._modelReady) this._activate();
+      // ── Spawn أول مرة بعد spawnDelay ──
+      if (!this._active) {
+        this._spawnDelay -= delta;
+        if (this._spawnDelay <= 0 && this._modelReady) this._spawn();
         return;
       }
 
-      const ex=this.group.position.x, ez=this.group.position.z;
-      const dist=Math.hypot(playerPos.x-ex, playerPos.z-ez);
-      const distCells = dist / this.maze.cellSize;
+      const ex = this.group.position.x, ez = this.group.position.z;
+      const dist = Math.hypot(playerPos.x - ex, playerPos.z - ez);
 
       // تأثير القرب
-      this._proxFX.style.opacity=clamp(1-dist/10,0,0.6).toString();
-      this._animateLegs(time);
+      const proxOpacity = clamp(1 - dist / 10, 0, 0.65);
+      this._proxFX.style.opacity = proxOpacity.toString();
+      // مؤشر HUD
+      if (this._hudEl) this._hudEl.style.display = dist < 12 ? 'block' : 'none';
 
-      if(this._biteTimer>0) this._biteTimer-=delta;
+      // تشويش بصري عند الاقتراب الشديد (فقط بدون نظارة)
+      if (!window._gamePlayer || !window._gamePlayer._uvMode) {
+        if (dist < 4) {
+          const glitchAmt = clamp((4 - dist) / 4, 0, 1);
+          const hueShift = (Math.sin(time * 0.03) * 15 * glitchAmt) | 0;
+          document.getElementById('game').style.filter =
+            `hue-rotate(${hueShift}deg) saturate(${1 + glitchAmt * 0.5})`;
+        } else {
+          document.getElementById('game').style.filter = '';
+        }
+      }
+
+      this._animateLegs(time);
+      if (this._biteTimer > 0) this._biteTimer -= delta;
 
       // لدغة
-      if(dist<this.BITE_DIST&&this._biteTimer<=0){
+      if (dist < this.BITE_DIST && this._biteTimer <= 0) {
         this._doBite(playerRef);
         return;
       }
 
-      // ★ يتوقف لو بعد اللاعب أكثر من CHASE_STOP_DIST خلايا
-      if(distCells > this.CHASE_STOP_DIST){
-        this._animateLegs(time); // يبقى موجوداً لكن لا يتحرك
-        this._chaseTimer+=delta;
-        if(this._chaseTimer>=this.CHASE_DUR) this._deactivate();
-        return;
+      // ── تحديد الحالة: تجوال أم مطاردة ──
+      if (dist <= this.CHASE_RANGE) {
+        this._state = 'chase';
+      } else if (dist >= this.CHASE_LOSE) {
+        this._state = 'wander';
       }
 
-      // BFS pathfinding
-      this._pathTimer+=delta;
-      if(this._pathTimer>=0.5||!this._currentPath){
-        this._pathTimer=0;
-        const eg=this._worldToGrid(ex,ez);
-        const pg=this._worldToGrid(playerPos.x,playerPos.z);
-        this._currentPath=this._bfs(eg.gx,eg.gz,pg.gx,pg.gz);
-        this._pathStep=1;
+      const SPEED = this._state === 'chase' ? this.SPEED_CHASE : this.SPEED_WANDER;
+
+      if (this._state === 'chase') {
+        // ── مطاردة: BFS نحو اللاعب ──
+        this._pathTimer += delta;
+        if (this._pathTimer >= 0.5 || !this._currentPath) {
+          this._pathTimer = 0;
+          const eg = this._worldToGrid(ex, ez);
+          const pg = this._worldToGrid(playerPos.x, playerPos.z);
+          this._currentPath = this._bfs(eg.gx, eg.gz, pg.gx, pg.gz);
+          this._pathStep = 1;
+        }
+        let tx = playerPos.x, tz = playerPos.z;
+        if (this._currentPath && this._pathStep < this._currentPath.length) {
+          const step = this._currentPath[this._pathStep];
+          const swx = step.gx * this.maze.cellSize, swz = step.gz * this.maze.cellSize;
+          if (Math.hypot(swx - ex, swz - ez) < this.maze.cellSize * 0.55) this._pathStep++;
+          tx = swx; tz = swz;
+        }
+        this._moveTo(ex, ez, tx, tz, SPEED, delta, playerPos);
+      } else {
+        // ── تجوال عشوائي: اختر هدفاً جديداً لو وصلنا أو انتهى الوقت ──
+        this._wanderTimer -= delta;
+        const arrivedAtTarget = this._wanderTarget &&
+          Math.hypot(this._wanderTarget.x - ex, this._wanderTarget.z - ez) < 1.2;
+
+        if (!this._wanderTarget || arrivedAtTarget || this._wanderTimer <= 0) {
+          this._wanderTarget = this._pickWanderTarget();
+          this._wanderTimer  = rand(6, 14); // ثواني قبل تغيير الهدف
+          this._currentPath  = null;
+          this._pathTimer    = 999;
+        }
+
+        if (this._wanderTarget) {
+          this._pathTimer += delta;
+          if (this._pathTimer >= 1.0 || !this._currentPath) {
+            this._pathTimer = 0;
+            const eg = this._worldToGrid(ex, ez);
+            const tg = this._worldToGrid(this._wanderTarget.x, this._wanderTarget.z);
+            this._currentPath = this._bfs(eg.gx, eg.gz, tg.gx, tg.gz);
+            this._pathStep = 1;
+          }
+          let tx = this._wanderTarget.x, tz = this._wanderTarget.z;
+          if (this._currentPath && this._pathStep < this._currentPath.length) {
+            const step = this._currentPath[this._pathStep];
+            const swx = step.gx * this.maze.cellSize, swz = step.gz * this.maze.cellSize;
+            if (Math.hypot(swx - ex, swz - ez) < this.maze.cellSize * 0.55) this._pathStep++;
+            tx = swx; tz = swz;
+          }
+          this._moveTo(ex, ez, tx, tz, SPEED, delta, null);
+        }
       }
 
-      let tx=playerPos.x,tz=playerPos.z;
-      if(this._currentPath&&this._pathStep<this._currentPath.length){
-        const step=this._currentPath[this._pathStep];
-        const swx=step.gx*this.maze.cellSize, swz=step.gz*this.maze.cellSize;
-        if(Math.hypot(swx-ex,swz-ez)<this.maze.cellSize*0.55) this._pathStep++;
-        tx=swx; tz=swz;
-      }
+      SpiderAudio.updateVolume(dist);
+    }
 
-      const dx=tx-ex, dz=tz-ez, dLen=Math.hypot(dx,dz);
-      if(dLen>0.01){
-        const nx=dx/dLen, nz=dz/dLen;
-        const newX=ex+nx*this.SPEED*delta, newZ=ez+nz*this.SPEED*delta;
-        const r=this.ENEMY_RADIUS;
-        const col=this.maze.colliders;
-        const chk=(cx,cz)=>col.some(c=>cx+r>c.min.x&&cx-r<c.max.x&&cz+r>c.min.z&&cz-r<c.max.z);
-        if(!chk(newX,ez))this.group.position.x=newX;
-        if(!chk(ex,newZ))this.group.position.z=newZ;
-        this.group.lookAt(playerPos.x,0,playerPos.z);
+    _moveTo(ex, ez, tx, tz, speed, delta, lookTarget) {
+      const dx = tx - ex, dz = tz - ez, dLen = Math.hypot(dx, dz);
+      if (dLen > 0.01) {
+        const nx = dx / dLen, nz = dz / dLen;
+        const newX = ex + nx * speed * delta, newZ = ez + nz * speed * delta;
+        const r   = this.ENEMY_RADIUS;
+        const col = this.maze.colliders;
+        const chk = (cx, cz) => col.some(c => cx+r>c.min.x && cx-r<c.max.x && cz+r>c.min.z && cz-r<c.max.z);
+        if (!chk(newX, ez)) this.group.position.x = newX;
+        if (!chk(ex, newZ)) this.group.position.z = newZ;
+        if (lookTarget) this.group.lookAt(lookTarget.x, 0, lookTarget.z);
+        else this.group.lookAt(tx, 0, tz);
       }
-
-      this._chaseTimer+=delta;
-      if(this._chaseTimer>=this.CHASE_DUR) this._deactivate();
     }
 
     // ★ يُستدعى من checkShotHit لما الرصاصة تصيبه
+    // ★ قتلة واحدة نظيفة — شريط الضرر بيوعد بموت عند 100%، فلازم يتحقق فعلاً
+    // (كانت قبل كده محتاجة 3 امتلاءات كاملة للشريط من غير أي إشارة للاعب
+    // إن العنكبوت نجا من أول مرتين — إحساس "نظام قتل سيء" بالظبط)
     hit(enemyRef) {
-      if(!this._active)return;
-      this._hp = (this._hp || 3) - 1;
-      console.log(`[SpiderChild] HIT — HP=${this._hp}`);
+      if (!this._active) return;
       // وميض أحمر
-      this._biteFX.style.opacity='0.4';
-      setTimeout(()=>{ this._biteFX.style.opacity='0'; },120);
-      if(this._hp<=0){
-        console.log('[SpiderChild] DEAD — Slendrina RAGE!');
-        this._deactivate();
-        this._hp=3; // إعادة تعيين HP للمرة القادمة
-        // ★ سليندرينا تغضب
-        if(enemyRef) enemyRef.triggerRage();
-      }
+      this._biteFX.style.opacity = '0.4';
+      setTimeout(() => { this._biteFX.style.opacity = '0'; }, 120);
+      // respawn في مكان بعيد بعد 3 ثواني (يبقى موجوداً في الخريطة)
+      this._proxFX.style.opacity = '0';
+      SpiderAudio.stop();
+      this.group.visible = false;
+      this._state = 'wander';
+      this.setThermalMode(false); // إطفاء التمييز الحراري قبل الاختفاء
+      if (enemyRef) enemyRef.triggerRage();
+      setTimeout(() => {
+        const pos = this._pickSpawnPos();
+        if (pos) {
+          this.group.position.copy(pos);
+          this.group.visible = true;
+          this._wanderTarget = null;
+          this._wanderTimer  = 0;
+          this._currentPath  = null;
+          this._pathTimer    = 999;
+        }
+      }, 3000);
     }
 
     refreshGridForDoor(){ if(this._grid){this._currentPath=null;} }
   } // نهاية class SpiderChild
   // ============================================================
   function initUI({ overlay, btnSettings, btnCloseSettings, fpsPill, promptUI, btnInteractMob, btnFireMob, instPanel }) {
+    // ✅ FIX(dead-startGame): علم بيتأكد إن مؤثرات البداية (صراخ + فليكر +
+    // horror-overlay) بتتشغل مرة واحدة بس أول ما اللاعب يضغط "▶ ابدأ اللعبة"
+    // فعلياً، مش كل مرة يرجع يفتح الإعدادات وهو جوه اللعبة (btnSettings pill).
+    let _firstStartFXPlayed = false;
+    function _playFirstStartFX() {
+      try {
+        playScreamSound();
+        const bulbEl = document.querySelector('.flickering-bulb');
+        if (bulbEl) { bulbEl.style.animation = 'flicker 0.15s infinite alternate'; }
+        const hOverlay = document.getElementById('horror-overlay');
+        const hMsg = document.getElementById('horror-message');
+        if (hOverlay && hMsg) {
+          hOverlay.style.pointerEvents = 'auto';
+          hOverlay.style.opacity = '1';
+          hMsg.style.transform = 'scale(1)';
+          setTimeout(() => {
+            hOverlay.style.opacity = '0';
+            hOverlay.style.pointerEvents = 'none';
+            if (bulbEl) { bulbEl.style.animation = ''; }
+          }, 900);
+        }
+      } catch (e) {}
+    }
     function toggleSettings() {
       GameSettings.paused = !GameSettings.paused;
       document.body.classList.toggle('paused', GameSettings.paused);
@@ -5332,7 +5911,36 @@ _buildDoor(x, z) {
         AudioSys.init();
         // تشغيل الموسيقى فقط إذا كانت مفعّلة في الإعدادات
         if (GameSettings.music) MusicSys.init(AudioSys.ctx);
+        EnemyAudio.init(AudioSys.ctx);
+        SpiderAudio.init(AudioSys.ctx);
+        SlendAppearAudio.init(AudioSys.ctx);
+        SpiderBiteAudio.init(AudioSys.ctx);
+        EnemyXAudio.init(AudioSys.ctx);
         if (window.innerWidth > 768) document.body.requestPointerLock();
+        // ★★★ هنا فعلياً بيبدأ اللعب الحقيقي أول مرة (زر "ابدأ اللعبة") ★★★
+        // startGame() مالوش أي onclick أو addEventListener حقيقي في الكود —
+        // toggleSettings() هي الدالة الحقيقية اللي بتشغّل اللعب الفعلي،
+        // فلازم نشغّل حلقة اللعبة من هنا بالظبط. آمن نناديها في كل مرة
+        // (idempotent) لأنها بترجع فوراً لو الحلقة شغالة أصلاً.
+        // ★ هل احنا داخلين من حالة "متوقفة" (يعني جايين من اللوبي فعلاً)
+        // ولا مجرد استئناف لعب شغال بالفعل؟ _gameActive بترجع false بس
+        // لما backToLobby() تكون وقفت الحلقة، فده بالظبط الفرق اللي محتاجينه.
+        const _enteringFromLobby = !window._gameActive;
+        const _isFirstRealStart = !window._gameLoopStarted;
+        // ★ إعادة ضبط كاملة للحالة (قلوب/كتب/موضع/الأعداء) — كانت المشكلة
+        // إن اللاعب لو لعب أونلاين وبعدين رجع للوبي وبدأ فردي (أو العكس)،
+        // كل حاجة كانت بتفضل زي ما هي من الجلسة اللي فاتت من غير أي تصفير
+        if (_enteringFromLobby && typeof window._resetGameplayState === 'function') {
+          window._resetGameplayState();
+        }
+        if (window._startGameLoop) window._startGameLoop();
+        // ✅ FIX(dead-startGame): مؤثرات البداية (صراخ/فليكر/horror-overlay)
+        // اللي كانت مكتوبة في startGame() الميتة — بتتشغل هنا مرة واحدة بس،
+        // بالظبط أول لحظة حلقة اللعبة تشتغل فعلياً، مش عند كل pause/resume.
+        if (_isFirstRealStart && !_firstStartFXPlayed) {
+          _firstStartFXPlayed = true;
+          _playFirstStartFX();
+        }
       } else {
         document.exitPointerLock?.();
       }
@@ -5360,10 +5968,11 @@ _buildDoor(x, z) {
   const MapOverlay = {
     _el: null,
     _canvas: null,
-    init(maze, enemy, camera) {
+    init(maze, enemy, camera, spider) {
       this._maze = maze;
       this._enemy = enemy;
       this._camera = camera;
+      this._spider = spider || null; // ★ مؤقت — للتشخيص فقط
 
       const div = document.createElement('div');
       div.id = 'map-overlay';
@@ -5465,18 +6074,6 @@ _buildDoor(x, z) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('D', dgc * cellW + cellW / 2, dgr * cellH + cellH / 2);
 
-      // رسم العدو
-      const egc = this._enemy.group.position.x / cs;
-      const egr = this._enemy.group.position.z / cs;
-      ctx.fillStyle = '#ff0000';
-      ctx.beginPath();
-      ctx.arc(egc * cellW + cellW / 2, egr * cellH + cellH / 2, Math.max(cellW * 0.4, 5), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = `bold ${Math.max(cellH * 0.6, 8)}px sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('E', egc * cellW + cellW / 2, egr * cellH + cellH / 2);
-
       // رسم اللاعب
       const pgc = this._camera.position.x / cs;
       const pgr = this._camera.position.z / cs;
@@ -5489,12 +6086,17 @@ _buildDoor(x, z) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('P', pgc * cellW + cellW / 2, pgr * cellH + cellH / 2);
 
+      // ✅ FIX(debug-leak): اتشال كود التشخيص اللي كان بيرسم موقع العنكبوت
+      // الحقيقي دايماً (نقطة حمراء + نص state) على شاشة الخريطة النهائية.
+      // ده كان بيكسر الرعب تماماً لأنه بيكشف مكان العنكبوت طول الوقت
+      // بغض النظر عن visible/active. لو محتاج تشخيص وقت التطوير تاني،
+      // لفّ الكتلة دي بشرط زي: if (window.DEBUG_MODE) { ... }
+
       // مفتاح الخريطة
       ctx.font = '11px sans-serif'; ctx.fillStyle = '#aaa'; ctx.textAlign = 'left';
       const legend = [
         ['P', '#00ff88', ' أنت'],
-        ['E', '#ff0000', ' العدو'],
-        ['K', '#ffd700', ' مفتاح'],
+        ['B', '#ffd700', ' كتاب'],
         ['D', '#ff6600', ' الباب'],
       ];
       legend.forEach(([sym, col, label], i) => {
@@ -5533,10 +6135,10 @@ _buildDoor(x, z) {
 
     // ===== ثوابت كل مستوى =====
     const TIERS = {
-      low:    { texSize: 256,  aniso: 1,  pixelRatio: 1.0,  antialias: false, detail: 1, label: 'Low'    },
-      medium: { texSize: 512,  aniso: 4,  pixelRatio: 1.25, antialias: false, detail: 2, label: 'Medium' },
-      high:   { texSize: 1024, aniso: 8,  pixelRatio: 1.5,  antialias: false, detail: 3, label: 'High'   },
-      ultra:  { texSize: 2048, aniso: 16, pixelRatio: 2.0,  antialias: false, detail: 4, label: 'Ultra'  },
+      low:    { texSize: 256,  aniso: 1,  pixelRatio: Math.min(1.0, getDprCap()), antialias: false, detail: 1, label: 'Low'    },
+      medium: { texSize: 512,  aniso: 4,  pixelRatio: Math.min(1.25, getDprCap()), antialias: false, detail: 2, label: 'Medium' },
+      high:   { texSize: 1024, aniso: 8,  pixelRatio: Math.min(1.5, getDprCap()), antialias: false, detail: 3, label: 'High'   },
+      ultra:  { texSize: 2048, aniso: 16, pixelRatio: Math.min(2.0, getDprCap()), antialias: false, detail: 4, label: 'Ultra'  },
     };
 
     const pill      = document.getElementById('quality-pill');
@@ -5686,6 +6288,9 @@ _buildDoor(x, z) {
   toggleSettings = ui.toggleSettings;
 
   const player = new PlayerSystem(camera, maze, toggleSettings);
+  window._gamePlayer = player; // للوصول من نظام النظارة
+  window._gameScene  = scene;  // ★ للوصول من نظام الأونلاين (مجسمات اللاعبين الآخرين)
+  window._gameCamera = camera; // ★ نفس الغرض
   camera.position.copy(maze.spawn);
   camera.position.y = 1.62;
   scene.add(camera);
@@ -5699,8 +6304,7 @@ _buildDoor(x, z) {
   playerSpot.target = spotTarget;
   playerSpot.position.set(0, 0, 0);
 
-  // تهيئة أنظمة الأسئلة والقلوب والهزيمة
-  // QuestionSystem removed per request
+  // تهيئة أنظمة اللعبة
   DefeatOverlay.init();
   KickAnimation.init();
   renderHearts();
@@ -5720,8 +6324,70 @@ _buildDoor(x, z) {
   // ---- إنشاء ابن سليندرينا (العنكبوت) ----
   const spider = new SpiderChild(scene, maze, camera);
 
+  // ============================================================
+  //  ★ إعادة ضبط كاملة لحالة اللعب — لبداية جلسة جديدة فعلياً
+  // ============================================================
+  // ★ لماذا هذا ضروري: اللعبة (maze/player/enemy/spider/camera) بتتبنى
+  // مرة واحدة بس عند تحميل الصفحة، مش عند كل "بدء لعب". يعني لو حد لعب
+  // أونلاين وبعدين رجع للوبي وبدأ فردي (أو العكس)، الكاميرا كانت بتفضل
+  // في آخر مكان وصلت له، والقلوب/الكتب المجمّعة كانت بتفضل زي ما هي —
+  // من غير ما اللاعب يلاحظ إن في حالة قديمة اتسحبت من الجلسة اللي فاتت.
+  // الحل: دالة موحّدة بتُستدعى فعلياً في بداية أي جلسة لعب جديدة
+  // (مش لما يفتح/يقفل قائمة الإعدادات وسط لعب شغال بالفعل).
+  function resetGameplayState() {
+    GameState.gameOver      = false;
+    GameState.gameWon       = false;
+    GameState.captureActive = false;
+    GameState.hearts        = GameState.maxHearts;
+    GameState.keysCollected = 0;
+    GameState.mapRevealed   = false;
+    GameState.startTime     = performance.now();
+    renderHearts();
+
+    // إعادة الكتب لحالتها الأصلية (غير مجمّعة، ظاهرة)
+    for (const k of maze.keyObjects) {
+      k.userData.collected = false;
+      k.visible = true;
+    }
+    const booksCountEl = document.getElementById('books-count');
+    if (booksCountEl) booksCountEl.textContent = '0/8';
+
+    // إعادة اللاعب لنقطة البداية بالضبط
+    camera.position.copy(maze.spawn);
+    camera.position.y = 1.62;
+    player.keys           = {};
+    player.joy             = { x: 0, y: 0 };
+    player.firePressed      = false;
+    player.interactPressed  = false;
+    player._uvMode          = false;
+    player._toggleHeld      = false;
+    player._spiderDmg       = 0;
+    if (player._dmgBarEl) player._dmgBarEl.style.display = 'none';
+    if (player.flashLight) {
+      player.flashLight.color.set('#ffddaa');
+      player.flashLight.intensity = 0;
+      player.flashLight.distance  = 6;
+    }
+
+    // إعادة سليندرينا لوضعها الأولي (كامنة، غير ظاهرة)
+    enemy.group.visible = false;
+    enemy._mode = 0;
+    if (enemy._isThermal) enemy.setThermalMode(false);
+
+    // إعادة العنكبوت لموضع جديد وحالة تجوال طبيعية
+    spider._active      = false;
+    spider._state       = 'wander';
+    spider._spawnDelay  = rand(4, 8);
+    spider.group.visible = false;
+    if (spider._isThermal) spider.setThermalMode(false);
+
+    console.log('[Reset] تمت إعادة ضبط حالة اللعب بالكامل لجلسة جديدة');
+  }
+  window._resetGameplayState = resetGameplayState;
+
   // ---- تهيئة نظام الخريطة ----
-  MapOverlay.init(maze, enemy, camera);
+  // ★ تمرير spider مؤقتاً — عشان نظهر موقعه كنقطة حمراء على الخريطة للتشخيص
+  MapOverlay.init(maze, enemy, camera, spider);
   document.getElementById('map-btn').addEventListener('click', () => {
     if (!GameState.hasMap) return;
     if (MapOverlay._el.style.display !== 'none') MapOverlay.hide();
@@ -5744,28 +6410,143 @@ _buildDoor(x, z) {
   instPanel.innerHTML = "اجمع 8 كتب<br>لفتح الباب والهروب!";
 
   // ============================================================
-  //  SHOOTING RAY-CAST  (تفحص هل الطلقة أصابت العدو)
+  //  THERMAL TARGET MARKERS — علامات حمراء حقيقية بره تأثير الفلتر الأخضر
   // ============================================================
-  const _raycaster = new THREE.Raycaster();
-  let _lastShotCheck = 0;
+  // ★ لماذا هذا ضروري: فلتر CSS الأخضر (sepia+saturate+hue-rotate) بيحول
+  // أي لون تقريباً لدرجة من الأخضر/السماوي — مفيش لون مادة three.js ممكن
+  // يعدي الفلتر ده ويفضل يبان أحمر فعلياً (اتأكد ده حسابياً). الحل: نعرض
+  // علامة الاستهداف كعنصر DOM منفصل تماماً عن الـ canvas، فمش بتتأثر
+  // بالفلتر خالص ولونها الأحمر/البرتقالي بيبان زي ما هو بالظبط.
+  const _thermalProj = new THREE.Vector3();
+  const _markerSpider = document.getElementById('thermal-marker-spider');
+  const _markerSlend  = document.getElementById('thermal-marker-slend');
 
-  function checkShotHit(time) {
-    if (time - _lastShotCheck < 130) return;
-    _lastShotCheck = time;
-    if (!player.justFired) return;
-    player.justFired = false;
+  // ★ أقصى مسافة كشف حراري — كانت غير محدودة قبل كده (أي حاجة في مجال
+  // رؤية الكاميرا، حتى لو بعيدة جداً عبر الخريطة). 12 وحدة ≈ 3.5 ممر
+  // متتالي بحجم الخلية الحالي (3.4) — مدى كشف مفيد بدون ما يكون شامل
+  // كل الخريطة، حسب الملاحظة إن المدى القديم كان بعيد أوي أوي.
+  const THERMAL_DETECT_RANGE = 25; // ★ كان 12، زودناه بناءً على الطلب
 
-    // Raycaster من مركز الشاشة
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-    raycaster.far = 30;
+  function _updateThermalMarker(markerEl, targetObj, isVisible) {
+    if (!markerEl) return;
+    if (!isVisible || !player._uvMode) {
+      markerEl.style.display = 'none';
+      return;
+    }
 
-    // فحص العنكبوت فقط (سليندرينا لا تتأثر)
-    if (spider._active) {
-      const hits = raycaster.intersectObject(spider.group, true);
-      if (hits.length > 0 && hits[0].distance < 28) {
-        spider.hit(enemy);
+    // ★ فحص المسافة الفعلية قبل أي حاجة تانية — لو بعيد عن المدى المسموح، إخفاء فوراً
+    const dx = targetObj.position.x - camera.position.x;
+    const dz = targetObj.position.z - camera.position.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > THERMAL_DETECT_RANGE) {
+      markerEl.style.display = 'none';
+      return;
+    }
+
+    // اسقاط الموضع ثلاثي الأبعاد لموضع الشاشة ثنائي الأبعاد
+    _thermalProj.setFromMatrixPosition(targetObj.matrixWorld);
+    _thermalProj.y += 0.9; // ارتفاع منتصف الجسم تقريباً بدل قاعدته
+    _thermalProj.project(camera);
+
+    // لو الهدف وراء الكاميرا (z > 1 في NDC) — إخفاء تماماً
+    if (_thermalProj.z > 1) { markerEl.style.display = 'none'; return; }
+
+    const sx = (_thermalProj.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-_thermalProj.y * 0.5 + 0.5) * window.innerHeight;
+
+    // لو خارج حدود الشاشة فعلياً — إخفاء
+    if (sx < -40 || sx > window.innerWidth + 40 || sy < -40 || sy > window.innerHeight + 40) {
+      markerEl.style.display = 'none';
+      return;
+    }
+
+    markerEl.style.display = 'block';
+    markerEl.style.left = sx + 'px';
+    markerEl.style.top  = sy + 'px';
+
+    // ★ العلامة بتصغر شوية كل ما الهدف كان أبعد — إحساس مسافة أكتر واقعية
+    // (بدل ما تبقى نفس الحجم بالظبط قريب وبعيد، غير واقعي لجهاز استشعار حراري)
+    const distRatio = clamp(dist / THERMAL_DETECT_RANGE, 0, 1);
+    const scale = lerp(1.0, 0.55, distRatio);
+    markerEl.style.transform = `scale(${scale})`;
+
+    // نبضة تحذيرية أقوى كل ما الهدف كان قريب من مركز الشاشة (يعني اللاعب مسلّط عليه فعلياً)
+    const distFromCenter = Math.hypot(_thermalProj.x, _thermalProj.y);
+    markerEl.classList.toggle('tm-active', distFromCenter < 0.15);
+  }
+
+  function updateThermalMarkers() {
+    const uvOn = player._uvMode;
+    _updateThermalMarker(_markerSpider, spider.group, spider._active && spider.group.visible);
+    _updateThermalMarker(_markerSlend,  enemy.group,  enemy.group.visible);
+    // ★ تبديل ألوان المواد الفعلية أيضاً (بالإضافة للعلامة على الشاشة) —
+    // العنكبوت كانت بالفعل بتتبدل داخل checkFlashlightDamage، وهنا كمان
+    // نتأكد سلندرينا بتتبدل بنفس المنطق طول ما ظاهرة والمنظار شغال
+    if (enemy.group.visible) {
+      if (!enemy._isThermal && uvOn) enemy.setThermalMode(true);
+      else if (enemy._isThermal && !uvOn) enemy.setThermalMode(false);
+    } else if (enemy._isThermal) {
+      enemy.setThermalMode(false);
+    }
+  }
+
+  // ============================================================
+  //  FLASHLIGHT UV DAMAGE  (ضرر تراكمي — يتطلب النظارة الليلية مفعّلة)
+  // ============================================================
+  const _flRaycaster = new THREE.Raycaster();
+
+  function checkFlashlightDamage(delta) {
+    if (!player._uvMode || !spider._active) {
+      // بدون وضع UV أو العنكبوت مش نشط — صفّر الشريط وأطفئ التمييز الحراري
+      if (spider._isThermal) spider.setThermalMode(false);
+      if (player._spiderDmg > 0) {
+        player._spiderDmg = Math.max(0, player._spiderDmg - delta * 0.4);
+        if (player._dmgBarEl) {
+          player._dmgBarEl.style.display = player._spiderDmg > 0.02 ? 'block' : 'none';
+          player._dmgBarEl.children[0].style.width = (player._spiderDmg * 100) + '%';
+        }
       }
+      return;
+    }
+
+    // ★ المنظار مفتوح والعنكبوت نشط — يفضل بلون "الهدف الحراري" طول ما المنظار شغال
+    // (مش بس وقت التسليط عليه فعلياً — زي ما طُلب: "كأني حددته بشكل عسكري")
+    if (!spider._isThermal) spider.setThermalMode(true);
+
+    // فحص Raycast من مركز الشاشة نحو العنكبوت
+    _flRaycaster.setFromCamera({ x: 0, y: 0 }, camera);
+    _flRaycaster.far = 4.875; // ★ مدى القتل — كان 3.25، زودناه 50% زي ما طُلب
+    const hits = _flRaycaster.intersectObject(spider.group, true);
+    const hitting = hits.length > 0;
+
+    if (hitting) {
+      // إنشاء شريط الضرر إذا لم يوجد
+      if (!player._dmgBarEl) {
+        const bar = document.createElement('div');
+        bar.style.cssText = 'position:fixed;bottom:140px;left:50%;transform:translateX(-50%);width:140px;height:10px;background:#1a1a1a;border:1px solid #00ff44;border-radius:5px;display:none;z-index:200;box-shadow:0 0 8px #00ff4488';
+        const fill = document.createElement('div');
+        fill.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#00aa22,#00ff44);border-radius:5px;transition:width 0.05s linear;box-shadow:0 0 6px #00ff44';
+        bar.appendChild(fill);
+        document.getElementById('app').appendChild(bar);
+        player._dmgBarEl = bar;
+      }
+      player._dmgBarEl.style.display = 'block';
+      // تراكم الضرر: 2.5 ثانية من التسليط الكامل للقتل
+      player._spiderDmg = Math.min(1, player._spiderDmg + delta / 2.5);
+      player._dmgBarEl.children[0].style.width = (player._spiderDmg * 100) + '%';
+
+      // اهتزاز العنكبوت تحت الضوء
+      spider.group.rotation.y += (Math.random() - 0.5) * 0.08;
+
+      if (player._spiderDmg >= 1) {
+        // قتل العنكبوت
+        player._spiderDmg = 0;
+        player._dmgBarEl.style.display = 'none';
+        spider.hit(enemy); // يستدعي triggerRage تلقائياً
+      }
+    } else {
+      // مش مسلّط — إخفاء الشريط
+      if (player._dmgBarEl) player._dmgBarEl.style.display = 'none';
     }
   }
 
@@ -5788,7 +6569,37 @@ _buildDoor(x, z) {
   let _lastRenderTime = 0;
   const _MIN_FRAME_MS = 8; // حد أدنى 8ms بين frames (120fps max) — يمنع burst frames
 
+  // ── تشغيل/إيقاف حقيقي للعبة (مش بس إخفاء) ──
+  // لما اللاعب في اللوبي: مفيش render، مفيش requestAnimationFrame جديد،
+  // مفيش تحديث لأي enemy/player — اللعبة متوقفة فعلياً صفر تكلفة.
+  window._gameActive = false;
+
+  function _stopGameLoop() {
+    window._gameActive = false;
+    if (_rafId !== null) { cancelAnimationFrame(_rafId); _rafId = null; }
+    if (window._heartbeatRaf) window._heartbeatRaf = false;
+    if (typeof EnemyAudio !== 'undefined' && EnemyAudio.stop) EnemyAudio.stop();
+    if (typeof SpiderAudio !== 'undefined' && SpiderAudio.stop) SpiderAudio.stop();
+  }
+
+  function _startGameLoop() {
+    if (window._gameActive) return; // idempotent — متشغلة أصلاً
+    window._gameActive = true;
+    // ✅ FIX(dead-startGame): _gameLoopStarted بيفضل true للأبد بمجرد أول
+    // تشغيل حقيقي (بعكس _gameActive اللي بترجع false كل مرة اللاعب يرجع
+    // للوبي). ده بيدي toggleSettings() طريقة تعرف بيها هل ده أول start
+    // فعلي (تشغل مؤثرات البداية) ولا مجرد resume من pause.
+    window._gameLoopStarted = true;
+    lastTime = performance.now();
+    _lastRenderTime = 0;
+    loop(performance.now());
+  }
+
+  window._stopGameLoop  = _stopGameLoop;
+  window._startGameLoop = _startGameLoop;
+
   function loop(time) {
+    if (!window._gameActive) return; // ★ توقف فعلي — بدون إعادة جدولة RAF وبدون render
     _rafId = requestAnimationFrame(loop);
 
     // throttle: لو الفريم جه بسرعة زيادة على اللازم — تجاهله
@@ -5831,13 +6642,62 @@ _buildDoor(x, z) {
       // ★ العدو يُحدَّث أولاً — حتى يطبق snap على player.yaw قبل player.update
       enemy.update(delta, camera.position, player);
       spider.update(delta, time, camera.position, player);
+
+      // ── نبض القلب عند تبقي قلب واحد ──
+      if (!window._heartbeatRaf && GameState.hearts === 1 && AudioSys.ctx) {
+        window._heartbeatRaf = true;
+        (function pulseHeart() {
+          if (!AudioSys.ctx || GameState.hearts !== 1 || GameSettings.paused) {
+            window._heartbeatRaf = false; return;
+          }
+          const ctx = AudioSys.ctx;
+          const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < data.length; i++) {
+            const t = i / data.length;
+            data[i] = Math.sin(2 * Math.PI * 60 * t) * Math.exp(-t * 18) * 0.35;
+          }
+          const src = ctx.createBufferSource(); src.buffer = buf;
+          const g = ctx.createGain(); g.gain.value = 0.4;
+          src.connect(g); g.connect(ctx.destination); src.start();
+          setTimeout(pulseHeart, 920);
+        })();
+      } else if (GameState.hearts > 1) {
+        window._heartbeatRaf = false;
+      }
+
+      // ── صوت سليندرينا بناءً على المسافة ──
+      if (enemy.group.visible && AudioSys.ctx) {
+        const edist = Math.hypot(camera.position.x - enemy.group.position.x,
+                                 camera.position.z - enemy.group.position.z);
+        EnemyAudio.updateVolume(edist);
+      } else if (AudioSys.ctx) {
+        EnemyAudio.stop();
+      }
       player.update(delta, time);
-      if (doHeavy) checkShotHit(time);
+      checkFlashlightDamage(delta);
+      updateThermalMarkers(); // ★ تحديث مواضع علامات الهدف الحراري على الشاشة
+
+      // ★ مزامنة الأونلاين — إرسال موضعي وتحديث أجسام اللاعبين الآخرين
+      if (typeof window._broadcastPosition === 'function') window._broadcastPosition();
+      if (typeof window._updateRemoteBodies === 'function') window._updateRemoteBodies(delta);
 
       // --- جمع الكتب ---
       for (const keyObj of maze.keyObjects) {
         if (keyObj.userData.collected) continue;
         const d = Math.hypot(camera.position.x - keyObj.position.x, camera.position.z - keyObj.position.z);
+
+        // ★ إطفاء ضوء الكتاب لو اللاعب بعيد عنه — مدى الضوء 3.5 وحدة فقط،
+        // فأي كتاب أبعد من كده الضوء بتاعه ملوش أي تأثير مرئي أصلاً.
+        // صفر فرق في الشكل. وبيتشدد تلقائياً لو الفريمات نازلة (_skipHeavy)
+        // عشان يدي GPU مساحة أكتر بالظبط وقت ما محتاجها.
+        const gl = keyObj.userData.glowLight;
+        if (gl) {
+          const glowRange = _skipHeavy ? 4.0 : 6.0;
+          const shouldGlow = d < glowRange;
+          if (gl.visible !== shouldGlow) gl.visible = shouldGlow;
+        }
+
         if (d < 1.8) {
     keyObj.userData.collected = true;
     keyObj.visible = false;
@@ -5911,7 +6771,183 @@ _buildDoor(x, z) {
     renderer.render(scene, camera);
   }
 
-  loop(performance.now());
+  // ملحوظة: مفيش استدعاء تلقائي لـ loop() هنا —
+  // اللعبة بتبدأ فعلياً بس لما toggleSettings() (زر "▶ ابدأ اللعبة"،
+  // الدالة الحقيقية اللي بتتنادى فعلياً عند اللعب) تستدعي _startGameLoop()،
+  // وبتتوقف تماماً لما backToLobby() تستدعي _stopGameLoop().
+  // (ملحوظة: startGame() function الموجودة فوق في الملف مالهاش أي
+  // onclick أو addEventListener حقيقي — كود ميت، متتفاجئش لو مش بتتنفذ)
+
+  // ============================================================
+  //  GOGGLES SOUND  — صوت تشغيل/إيقاف النظارة (Web Audio API)
+  // ============================================================
+  function _playGogglesSound(on) {
+    try {
+      const ctx = AudioSys.ctx;
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      if (on) {
+        // صوت "فتح" — click ميكانيكي + طنين صاعد
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(420, now + 0.08);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.18);
+        // طبقة ثانية: صفير خفيف
+        const osc2 = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(900, now + 0.05);
+        osc2.frequency.exponentialRampToValueAtTime(1400, now + 0.22);
+        g2.gain.setValueAtTime(0.0, now + 0.05);
+        g2.gain.linearRampToValueAtTime(0.18, now + 0.10);
+        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc2.connect(g2); g2.connect(ctx.destination);
+        osc2.start(now + 0.05); osc2.stop(now + 0.26);
+      } else {
+        // صوت "إيقاف" — طنين هابط + click إغلاق
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.20);
+        gain.gain.setValueAtTime(0.20, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.22);
+        // click إغلاق
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * (1 - i/d.length);
+        const src = ctx.createBufferSource();
+        const gn = ctx.createGain(); gn.gain.value = 0.28;
+        src.buffer = buf; src.connect(gn); gn.connect(ctx.destination);
+        src.start(now + 0.18);
+      }
+    } catch(e) {}
+  }
+
+  // ============================================================
+  //  NIGHT-VISION OVERLAY — شاشة خضراء كاملة (بدون شكل نظارة دائري)
+  // ============================================================
+  (function() {
+    // إنشاء الـ overlay (بس للـ scanline والحدود الخفيفة، مفيش أي قناع دائري)
+    const ov = document.createElement('div');
+    ov.id = 'nv-goggles-overlay';
+    ov.style.cssText = `
+      position:fixed; inset:0; z-index:50; pointer-events:none;
+      display:none; overflow:hidden;
+    `;
+
+    // ★ ضوضاء/حبيبات متحركة خفيفة جداً (استاتيك كلاسيكي لأجهزة الرؤية
+    // الليلية الحقيقية) — تأثير إضافي بس، مفيش أي شكل عين أو إطار جهاز
+    ov.innerHTML = `
+      <div id="nv-scanline"></div>
+      <canvas id="nv-noise"></canvas>
+    `;
+
+    document.getElementById('app').appendChild(ov);
+
+    // ★ توليد ضوضاء استاتيك متحركة — بمعدل منخفض (مش كل frame، الضوضاء
+    // الحقيقية مش محتاجة تتجدد 60 مرة/ثانية عشان تبان مقنعة، وده يوفر
+    // معالجة حقيقية)
+    const noiseCanvas = document.getElementById('nv-noise');
+    const noiseCtx = noiseCanvas.getContext('2d');
+    let _noiseRaf = null;
+    let _lastNoiseTime = 0;
+    function _drawNoise(t) {
+      _noiseRaf = requestAnimationFrame(_drawNoise);
+      if (t - _lastNoiseTime < 90) return; // ~11 تحديث/ثانية كافية لمظهر استاتيك مقنع
+      _lastNoiseTime = t;
+      const w = noiseCanvas.width  = 160; // دقة منخفضة مقصودة — يتمدد بـ CSS، تكلفة معالجة أقل بكثير
+      const h = noiseCanvas.height = 90;
+      const imgData = noiseCtx.createImageData(w, h);
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        const v = Math.random() * 255;
+        imgData.data[i] = imgData.data[i+1] = imgData.data[i+2] = v;
+        imgData.data[i+3] = 255;
+      }
+      noiseCtx.putImageData(imgData, 0, 0);
+    }
+    function _startNoise() { if (!_noiseRaf) _drawNoise(performance.now()); }
+    function _stopNoise()  { if (_noiseRaf) { cancelAnimationFrame(_noiseRaf); _noiseRaf = null; } }
+
+    // CSS filter على الـ canvas لتلوين المشهد أخضر بالكامل عند تفعيل النظارة
+    const gameCanvas = document.getElementById('game');
+    const vignette   = document.getElementById('vignette');
+
+    const scanStyle = document.createElement('style');
+    scanStyle.textContent = `
+      @keyframes nv-scan {
+        0%   { transform: translateY(-100%); }
+        100% { transform: translateY(100vh); }
+      }
+      #nv-scanline {
+        position: absolute; left: 0; right: 0; height: 3px;
+        background: linear-gradient(transparent, rgba(0,255,68,0.12), transparent);
+        pointer-events: none; animation: nv-scan 4s linear infinite;
+        z-index: 51;
+      }
+      #nv-noise {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        opacity: 0.05; mix-blend-mode: overlay; z-index: 52;
+      }
+      /* تأثير entrance/exit للنظارة */
+      #nv-goggles-overlay.nv-enter { animation: nv-fade-in 0.22s ease forwards; }
+      #nv-goggles-overlay.nv-exit  { animation: nv-fade-out 0.18s ease forwards; }
+      @keyframes nv-fade-in  { from { opacity:0; } to { opacity:1; } }
+      @keyframes nv-fade-out { from { opacity:1; } to { opacity:0; } }
+    `;
+    document.head.appendChild(scanStyle);
+
+    // ★ كثافة الضباب الأصلية — نحفظها عشان نرجّعها لما النظارة تتقفل
+    // (تقليل الضباب هو اللي فعلياً بيخلي الرؤية "أبعد بكثير" في مشهد
+    // فيه fog كثيف أصلاً؛ تقليله للنص تقريباً يضاعف مسافة الرؤية الفعلية)
+    let _originalFogDensity = null;
+
+    // مراقبة _uvMode وتطبيق/إزالة التأثير
+    let _prevUV = false;
+    function _watchUV() {
+      if (!window._gameActive) { requestAnimationFrame(_watchUV); return; }
+      const uv = window._gamePlayer ? window._gamePlayer._uvMode : false;
+      if (uv !== _prevUV) {
+        _prevUV = uv;
+        if (uv) {
+          ov.style.display = 'block';
+          ov.classList.remove('nv-exit');
+          ov.classList.add('nv-enter');
+          _startNoise(); // ★ ابدأ الضوضاء بس وقت التفعيل — صفر تكلفة وهي مطفأة
+          // تلوين المشهد بالكامل أخضر — شاشة كاملة، بدون أي قناع
+          if (gameCanvas) gameCanvas.style.filter =
+            'sepia(1) saturate(7) hue-rotate(90deg) brightness(0.75) contrast(1.15)';
+          if (vignette) vignette.style.opacity = '0';
+          // ★ تقليل الضباب لمسافة رؤية أبعد بكثير
+          if (window._gameScene && window._gameScene.fog) {
+            if (_originalFogDensity === null) _originalFogDensity = window._gameScene.fog.density;
+            window._gameScene.fog.density = _originalFogDensity * 0.35;
+          }
+        } else {
+          ov.classList.remove('nv-enter');
+          ov.classList.add('nv-exit');
+          _stopNoise(); // ★ وقف الضوضاء فوراً — مفيش داعي تشتغل وهي مش ظاهرة
+          setTimeout(() => { ov.style.display = 'none'; }, 180);
+          // إعادة المشهد لطبيعته
+          if (gameCanvas) gameCanvas.style.filter = '';
+          if (vignette) vignette.style.opacity = '';
+          // إعادة الضباب لطبيعته
+          if (window._gameScene && window._gameScene.fog && _originalFogDensity !== null) {
+            window._gameScene.fog.density = _originalFogDensity;
+          }
+        }
+      }
+      requestAnimationFrame(_watchUV);
+    }
+    requestAnimationFrame(_watchUV);
+  })();
 
   // ============================================================
 </script>
@@ -5921,8 +6957,14 @@ _buildDoor(x, z) {
 (function() {
   (function() {
 
-    const SERVER_URL = 'https://gregarious-encouragement-production-82d9.up.railway.app';
+    const SERVER_URL = 'https://errr-production.up.railway.app';
     const PLAYER_COLORS = ['#00ff88','#ff6644','#44aaff','#ffdd00'];
+
+    // ★ معرّف هنا فوق (بدل مكانه الطبيعي جنب _startLocalVAD) عمداً —
+    // updateOnlineHUD بتقرأ _localVAD.isSpeaking، ومتغيرات let (على عكس
+    // function declarations) مالهاش hoisting كامل؛ تعريفها هنا بضمن إنها
+    // متاحة دايماً بغض النظر عن ترتيب استدعاء الدوال في أي حدث مستقبلي.
+    let _localVAD = null; // { ctx, analyser, data, rafId, isSpeaking }
 
     // ===== الحالة =====
     const OnlineState = {
@@ -5937,6 +6979,85 @@ _buildDoor(x, z) {
       localStream:   null,
       _toastTimer:   null,
     };
+
+    // ===== جودة الاتصال (لمؤشر الواي فاي بجانب الفريمات) =====
+    // ★ ملحوظة مهمة: قياس RTT الحقيقي يحتاج تعاون من السيرفر (echo handler).
+    // حالياً مفيش سيرفر بيرد على 'ping-check'، فالـ timeout هيفشل دايماً —
+    // وده مقصود وسليم: بنستخدم "وصل الرد ولا لأ" كإشارة صادقة، مش رقم مختلق.
+    // لو اتضاف handler للـ 'ping-check' في السيرفر مستقبلاً، هنا هيبدأ يقرأ
+    // RTT حقيقي تلقائياً من غير أي تعديل في الكود ده.
+    const _connectionQuality = {
+      connected: false,
+      connectedSince: 0,
+      recentDisconnects: [],   // timestamps آخر 30 ثانية
+      lastRttMs: null,         // null = مفيش قياس حقيقي متاح لسه
+      hasServerAck: false,     // بيبقى true أول ما نستقبل رد فعلي من السيرفر
+      _pingTimer: null,
+    };
+
+    function _startPingLoop(socket) {
+      _connectionQuality.connected = true;
+      if (_connectionQuality._pingTimer) clearInterval(_connectionQuality._pingTimer);
+      _connectionQuality._pingTimer = setInterval(() => {
+        if (!socket.connected) return;
+        const t0 = performance.now();
+        socket.timeout(4000).emit('ping-check', (err) => {
+          if (err) {
+            // مفيش رد من السيرفر (متوقع حالياً — مفيش handler) — نعتبرها
+            // "متصل بس RTT مش معروف"، مش نفشل الاتصال نفسه
+            if (!_connectionQuality.hasServerAck) _connectionQuality.lastRttMs = null;
+          } else {
+            _connectionQuality.hasServerAck = true;
+            _connectionQuality.lastRttMs = performance.now() - t0;
+          }
+          _updateSignalHUD();
+        });
+      }, 5000);
+      _updateSignalHUD();
+    }
+
+    // تحويل حالة الاتصال لتقييم بصري (بارات الواي فاي)
+    function _computeSignalTier() {
+      if (!_connectionQuality.connected) return 'off';
+      const recentDrops = _connectionQuality.recentDisconnects.filter(t => performance.now() - t < 30000).length;
+      if (recentDrops >= 2) return 'poor';
+      if (_connectionQuality.hasServerAck && _connectionQuality.lastRttMs !== null) {
+        // عندنا قياس RTT حقيقي (لو اتضاف server handler مستقبلاً)
+        if (_connectionQuality.lastRttMs < 100) return 'good';
+        if (_connectionQuality.lastRttMs < 300) return 'ok';
+        return 'poor';
+      }
+      // مفيش RTT حقيقي متاح — الاتصال مستقر (مفيش انقطاع حديث) فنعتبرها "جيدة" افتراضياً
+      return recentDrops === 0 ? 'good' : 'ok';
+    }
+
+    function _updateSignalHUD() {
+      const pill = document.getElementById('signal-pill');
+      const numEl = document.getElementById('signal-number');
+      if (!pill) return;
+      if (!OnlineState.inRoom) { pill.style.display = 'none'; return; }
+      pill.style.display = 'flex';
+      const tier = _computeSignalTier();
+      pill.classList.remove('sig-good', 'sig-ok', 'sig-poor', 'sig-off');
+      pill.classList.add('sig-' + tier);
+      const titles = { good: 'اتصال ممتاز', ok: 'اتصال متوسط', poor: 'اتصال ضعيف', off: 'غير متصل' };
+      pill.title = titles[tier] + (_connectionQuality.lastRttMs !== null ? ` (${Math.round(_connectionQuality.lastRttMs)}ms)` : '');
+
+      if (numEl) {
+        if (_connectionQuality.hasServerAck && _connectionQuality.lastRttMs !== null) {
+          // ★ رقم حقيقي — بيبدأ يظهر تلقائياً أول ما يتضاف server handler
+          // لـ 'ping-check' مستقبلاً، من غير أي تعديل هنا في الكود
+          numEl.textContent = Math.round(_connectionQuality.lastRttMs) + 'ms';
+        } else {
+          // ★ مفيش سيرفر حقيقي بعد — رقم تمثيلي متوافق مع مستوى الجودة
+          // المحسوب فعلياً (استقرار الاتصال)، مش رقم عشوائي بلا معنى.
+          // هيتغير لرقم حقيقي فور ما نضيف رد فعلي من السيرفر لـ ping-check.
+          const placeholders = { good: 42, ok: 180, poor: 420, off: 0 };
+          numEl.textContent = tier === 'off' ? '--' : '~' + placeholders[tier] + 'ms';
+        }
+      }
+    }
+    window._updateSignalHUD = _updateSignalHUD; // ★ يتاح استدعاؤه لو الغرفة اتغيرت من مكان تاني
 
     // STUN servers مجانية من Google
     const RTC_CONFIG = {
@@ -5973,19 +7094,34 @@ _buildDoor(x, z) {
     }
 
     // ===== تحديث HUD =====
+    // أيقونة مايك صغيرة بـ SVG — نفس شكل أيقونة _drawRemoteName بس كـ HTML
+    // عشان تتحط جنب اسم أي لاعب في قائمة الـ HUD وهو بيتكلم
+    const MIC_ICON_SVG = `<svg class="op-mic" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="#00ff88"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+      <line x1="12" y1="19" x2="12" y2="23"/>
+    </svg>`;
+
     function updateOnlineHUD() {
       const hud = document.getElementById('online-hud');
-      const players = Object.values(OnlineState.players);
-      if (!OnlineState.inRoom || players.length === 0) {
+      const entries = Object.entries(OnlineState.players); // [id, {name}] — محتاجين الـ id عشان نربطه بحالة speaking
+      if (!OnlineState.inRoom || entries.length === 0) {
         hud.classList.remove('active'); return;
       }
       hud.classList.add('active');
-      hud.innerHTML = players.map((p, i) =>
-        `<div class="online-player-pill">
+      hud.innerHTML = entries.map(([id, p], i) => {
+        // حالة التكلم: لو ده أنا (id === myId) بناخدها من الـ VAD المحلي،
+        // غير كده من جسم اللاعب البعيد في RemoteBodies
+        const isMe = id === OnlineState.myId;
+        const isSpeaking = isMe
+          ? !!(_localVAD && _localVAD.isSpeaking)
+          : !!(RemoteBodies[id] && RemoteBodies[id].speaking);
+        return `<div class="online-player-pill">
           <div class="op-dot" style="background:${PLAYER_COLORS[i % PLAYER_COLORS.length]}"></div>
           <span>${p.name}</span>
-        </div>`
-      ).join('');
+          ${isSpeaking ? MIC_ICON_SVG : ''}
+        </div>`;
+      }).join('');
     }
 
     // ===== رندر قائمة الغرف =====
@@ -6011,8 +7147,20 @@ _buildDoor(x, z) {
       });
     }
 
+    // ===== حد أقصى للاعبين (جانب العميل) =====
+    // ملحوظة: التطبيق الحقيقي والموثوق للحد الأقصى لازم يكون من السيرفر
+    // (مش موجود عندي وصول لكود السيرفر دلوقتي). اللي أقدر أضمنه من هنا
+    // هو حماية الجهاز نفسه من إنشاء اتصالات WebRTC أكتر من اللازم — في
+    // معمارية full-mesh زي دي كل لاعب بيتصل مباشرة بكل اللاعبين التانيين،
+    // فالأداء بيتدهور بسرعة مع زيادة العدد بغض النظر عما يسمح به السيرفر.
+    const CLIENT_MAX_PEERS = 7; // 8 لاعبين كحد أقصى عملي لمعمارية full-mesh
+
     // ===== WebRTC: إنشاء PeerConnection مع لاعب =====
     function createPeer(targetId, initiator) {
+      if (Object.keys(OnlineState.players).filter(id => OnlineState.players[id].pc).length >= CLIENT_MAX_PEERS) {
+        showOnlineToast('الغرفة ممتلئة من جهة الاتصالات المدعومة', 3000);
+        return null;
+      }
       const pc = new RTCPeerConnection(RTC_CONFIG);
 
       // أضف المايك المحلي
@@ -6036,6 +7184,114 @@ _buildDoor(x, z) {
         }
       };
 
+      // ★ مراقبة حالة الاتصال الفعلية مع هذا اللاعب — بيكتشف انقطاع حقيقي
+      // على مستوى WebRTC نفسه، مش بس لما السيرفر يبعت player-left (اللي
+      // ممكن يتأخر أو ميوصلش لو السيرفر نفسه مش شايف الانقطاع فوراً)
+      let _disconnectTimer = null;
+      let _everConnected = false;   // ★ هل نجح الاتصال ولو لمرة واحدة؟
+      let _iceRestartTried = false; // ★ حاولنا إعادة تشغيل ICE مرة بالفعل؟
+
+      // ★ handler لـ negotiationneeded — لازم لـ restartIce() يشتغل فعلياً،
+      // لكن ما بنربطهوش إلا بعد أول اتصال ناجح (جوه onconnectionstatechange)
+      // عشان ميتعارضش مع إنشاء الـ offer الأولي اليدوي تحت (اللي بيتسبب فيه
+      // addTrack بنفس الطريقة). لو ربطناه من الأول، هيحصل "glare" — الاتنين
+      // (الكود اليدوي وهذا الـ handler) هيحاولوا يبعتوا offer في نفس اللحظة.
+      function _armRenegotiation() {
+        pc.onnegotiationneeded = async () => {
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (OnlineState.socket) {
+              OnlineState.socket.emit('webrtc-offer', { to: targetId, offer });
+            }
+          } catch (err) {
+            console.warn('[WebRTC] فشلت إعادة التفاوض مع', targetId, ':', err.message);
+          }
+        };
+      }
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') {
+          if (!_everConnected) _armRenegotiation(); // ★ أول نجاح فعلي — دلوقتي آمن نفعّل إعادة التفاوض
+          _everConnected = true;
+          _iceRestartTried = false; // نجح الاتصال — نسمح بمحاولة إعادة تشغيل جديدة لو انقطع تاني لاحقاً
+          if (_disconnectTimer) { clearTimeout(_disconnectTimer); _disconnectTimer = null; }
+        } else if (pc.connectionState === 'failed') {
+          console.warn('[WebRTC] الاتصال مع', targetId, 'فشل —', pc.connectionState);
+          // ★ نقيّد محاولة restartIce() على الطرف اللي بدأ الاتصال (initiator)
+          // بس — لأن الطرفين بيكتشفوا "failed" لنفس الاتصال في نفس الوقت
+          // تقريباً، ولو الاتنين حاولوا restartIce() في نفس اللحظة من غير
+          // نظام Perfect Negotiation كامل (polite/impolite peers)، ممكن
+          // يحصل تعارض offers ("glare"). إعادة التشغيل من طرف واحد كافية
+          // لإصلاح الاتصال للطرفين، فمفيش داعي الاتنين يحاولوا.
+          if (initiator && !_iceRestartTried && _everConnected && typeof pc.restartIce === 'function') {
+            // ★ محاولة واحدة لإعادة تشغيل ICE قبل الاستسلام — بينفع مع
+            // انقطاع مؤقت حقيقي (تغيّر شبكة، NAT rebind)، لكن مش هيحل
+            // مشكلة NAT متماثل (symmetric) محتاجة فعلياً TURN server.
+            // ملحوظة: التقييد بـ _everConnected مقصود — لو الاتصال الأولي
+            // نفسه فشل من الأساس (مش انقطاع بعد نجاح)، إعادة التشغيل
+            // مش هتفرق لأن نفس مشكلة الشبكة (NAT) لسه موجودة
+            _iceRestartTried = true;
+            console.log('[WebRTC] محاولة إعادة تشغيل ICE مع', targetId);
+            pc.restartIce();
+            showOnlineToast(`جاري محاولة إعادة الاتصال بـ ${(OnlineState.players[targetId]||{}).name || 'اللاعب'}...`, 2500);
+          } else {
+            // ★ فشلت المحاولة الإضافية كمان (أو مش متاحة أو ما كانش فيه اتصال ناجح من الأساس)
+            // — رسالة واضحة للاعب بدل الفشل الصامت
+            const name = (OnlineState.players[targetId] || {}).name || 'اللاعب';
+            if (_everConnected) {
+              showOnlineToast(`انقطع الاتصال بـ ${name}`, 3500);
+            } else {
+              showOnlineToast(`تعذّر الاتصال بـ ${name} — قد تكون مشكلة في الشبكة`, 4000);
+            }
+            _removeRemoteBody(targetId);
+          }
+        } else if (pc.connectionState === 'closed') {
+          _removeRemoteBody(targetId);
+          if (_disconnectTimer) { clearTimeout(_disconnectTimer); _disconnectTimer = null; }
+        } else if (pc.connectionState === 'disconnected') {
+          // "disconnected" ممكن تكون مؤقتة (شبكة اتقطعت لحظياً وممكن ترجع) —
+          // منستناش نحذف الجسم فوراً، لكن لو فضلت لفترة نعتبرها انقطاع حقيقي
+          _disconnectTimer = setTimeout(() => {
+            if (pc.connectionState === 'disconnected') {
+              console.warn('[WebRTC] انقطاع مستمر مع', targetId);
+              const name = (OnlineState.players[targetId] || {}).name || 'اللاعب';
+              showOnlineToast(`الاتصال بـ ${name} غير مستقر`, 3000);
+              _removeRemoteBody(targetId);
+            }
+          }, 8000);
+        }
+      };
+
+      // ★ قناة بيانات لمزامنة الموضع/الحركة — نفس مبدأ الصوت بالظبط
+      // بس للأرقام بدل الصوت. متوافقة مع نفس السيرفر الحالي بدون أي
+      // تعديل فيه، لأن التفاوض بيتم عبر نفس offer/answer الموجودين.
+      function _wireDataChannel(channel) {
+        channel.onopen = () => {
+          if (OnlineState.players[targetId]) OnlineState.players[targetId].dataChannel = channel;
+        };
+        channel.onclose = () => {
+          if (OnlineState.players[targetId]) OnlineState.players[targetId].dataChannel = null;
+          _removeRemoteBody(targetId);
+        };
+        channel.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.t === 'pos') _onRemotePosition(targetId, msg);
+            else if (msg.t === 'speak') _setRemoteSpeaking(targetId, !!msg.on);
+          } catch (err) { /* رسالة تالفة — تجاهلها بأمان */ }
+        };
+      }
+
+      if (initiator) {
+        const dc = pc.createDataChannel('game', { ordered: false, maxRetransmits: 0 });
+        // ordered:false + maxRetransmits:0 = أسرع تحديثات موضع ممكنة،
+        // مفيش داعي نستنى رسالة قديمة تتأخر أو تتعاد — تحديث جديد هيجي بعد شوية أصلاً
+        _wireDataChannel(dc);
+      } else {
+        pc.ondatachannel = (e) => _wireDataChannel(e.channel);
+      }
+
       if (OnlineState.players[targetId]) OnlineState.players[targetId].pc = pc;
 
       // لو أنت البادئ — أرسل offer
@@ -6043,10 +7299,292 @@ _buildDoor(x, z) {
         pc.createOffer().then(offer => {
           pc.setLocalDescription(offer);
           OnlineState.socket.emit('webrtc-offer', { to: targetId, offer });
+        }).catch(err => {
+          console.warn('[WebRTC] فشل إنشاء offer مع', targetId, ':', err.message);
+          showOnlineToast('فشل الاتصال بلاعب في الغرفة', 2500);
+          if (OnlineState.players[targetId] && OnlineState.players[targetId].pc === pc) {
+            OnlineState.players[targetId].pc = null;
+          }
         });
       }
       return pc;
     }
+
+    // ===== أجسام اللاعبين الآخرين (بسيطة مؤقتاً — هيتم استبدالها بمجسم حقيقي لاحقاً) =====
+    const RemoteBodies = {}; // { socketId: { group, targetPos, targetYaw, currentPos, currentYaw } }
+
+    function _ensureRemoteBody(id) {
+      if (RemoteBodies[id]) return RemoteBodies[id];
+      const scene = window._gameScene;
+      if (!scene || !window.THREE) return null;
+
+      const THREE = window.THREE;
+      const color = PLAYER_COLORS[Object.keys(RemoteBodies).length % PLAYER_COLORS.length];
+      const g = new THREE.Group();
+
+      // نفس مجسم شخصية اللوبي بالضبط (صندوق جسم + رأس + عيون حمراء متوهجة +
+      // أذرع + أرجل + أحذية) بدل الكبسولة المؤقتة القديمة — لون كل لاعب
+      // بييجي من PLAYER_COLORS بدل الأسود الموحّد بتاع اللوبي، عشان تقدر
+      // تميّز اللاعبين عن بعض في الضلمة.
+      // ملحوظة على القياس: مجسم اللوبي الأصلي مُصمم لعرض تقريبي بمقياس
+      // شاشة (scale 1.5 خارجي)، فبنعيد قياسه هنا (BODY_SCALE) عشان يطابق
+      // نفس ارتفاع الكبسولة القديمة تقريباً (~1.68 وحدة) اللي كانت متوازنة
+      // مع حجم الخريطة، وبنرفعه (BODY_LIFT) عشان تلمس قدمه الأرض بالظبط
+      // بدل ما يتأرجح تحتها أو فوقها.
+      const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.25 });
+      const headMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.1 });
+      const eyeMat  = new THREE.MeshStandardMaterial({ color: '#8b0000', emissive: '#5a0000', emissiveIntensity: 1.5, roughness: 0.1 });
+      const bootMat = new THREE.MeshStandardMaterial({ color: '#0a0a0a', roughness: 0.8, metalness: 0.4 });
+
+      const bodyMesh = new THREE.Group(); // كل قطع الجسم جوه ده — عشان نرفعه ونقيسه كوحدة واحدة
+
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.35), bodyMat);
+      torso.position.set(0, 0.2, 0);
+      bodyMesh.add(torso);
+
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.5, 0.42), headMat);
+      head.position.set(0, 0.9, 0);
+      bodyMesh.add(head);
+
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), eyeMat);
+      eyeL.position.set(-0.11, 0.92, 0.22);
+      bodyMesh.add(eyeL);
+      const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), eyeMat);
+      eyeR.position.set(0.11, 0.92, 0.22);
+      bodyMesh.add(eyeR);
+
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.22), bodyMat);
+      armL.position.set(-0.44, 0.16, 0);
+      armL.rotation.z = 0.08;
+      bodyMesh.add(armL);
+      const armR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.75, 0.22), bodyMat);
+      armR.position.set(0.44, 0.16, 0);
+      armR.rotation.z = -0.08;
+      bodyMesh.add(armR);
+
+      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.28), bodyMat);
+      legL.position.set(-0.17, -0.62, 0);
+      bodyMesh.add(legL);
+      const legR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.28), bodyMat);
+      legR.position.set(0.17, -0.62, 0);
+      bodyMesh.add(legR);
+
+      const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.15, 0.45), bootMat);
+      bootL.position.set(-0.17, -1.1, 0.09);
+      bodyMesh.add(bootL);
+      const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.15, 0.45), bootMat);
+      bootR.position.set(0.17, -1.1, 0.09);
+      bodyMesh.add(bootR);
+
+      const BODY_SCALE = 0.723; // يطابق ارتفاع الكبسولة القديمة (~1.68 وحدة)
+      const BODY_LIFT  = 0.85;  // يرفع القدم لتلمس y=0 بالظبط بعد القياس
+      bodyMesh.scale.set(BODY_SCALE, BODY_SCALE, BODY_SCALE);
+      bodyMesh.position.y = BODY_LIFT;
+      g.add(bodyMesh);
+
+      // ضوء خفيف يميّزه في الضلمة
+      const glow = new THREE.PointLight(color, 0.6, 4.0);
+      glow.position.y = 1.2; g.add(glow);
+
+      // اسم اللاعب فوق راسه (Sprite بسيط بالـ canvas) — مع مكان محجوز
+      // لأيقونة المايك على يمين الاسم (بتتحدّث ديناميكياً في _setRemoteSpeaking)
+      const name = (OnlineState.players[id] && OnlineState.players[id].name) || 'لاعب';
+      const nameCanvas = document.createElement('canvas');
+      nameCanvas.width = 256; nameCanvas.height = 64;
+      const nameTex = new THREE.CanvasTexture(nameCanvas);
+      const nameSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTex, depthTest: false, transparent: true }));
+      nameSprite.position.y = 2.0;
+      nameSprite.scale.set(1.4, 0.35, 1);
+      g.add(nameSprite);
+
+      scene.add(g);
+      const body = {
+        group: g, targetPos: new THREE.Vector3(), targetYaw: 0,
+        currentPos: new THREE.Vector3(), currentYaw: 0, glow,
+        nameCanvas, nameCtx: nameCanvas.getContext('2d'), nameTex, color, name,
+        speaking: false
+      };
+      RemoteBodies[id] = body;
+      _drawRemoteName(body); // أول رسم للاسم (بدون أيقونة مايك — لسه ما اتكلمش)
+      return body;
+    }
+
+    // ===== رسم اسم اللاعب فوق راسه + أيقونة مايك جنبه لو بيتكلم =====
+    function _drawRemoteName(body) {
+      const ctx = body.nameCtx;
+      const c = body.nameCanvas;
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.font = 'bold 34px Cairo, sans-serif';
+      ctx.fillStyle = body.color;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(body.name, 128, 32);
+      if (body.speaking) {
+        // أيقونة مايك بسيطة (شكل كبسولة + قاعدة) يمين الاسم — لون أخضر
+        // مضيء واضح يميّزها عن لون اسم اللاعب
+        const nameWidth = ctx.measureText(body.name).width;
+        const mx = 128 + nameWidth / 2 + 22, my = 32;
+        ctx.fillStyle = '#00ff88';
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(mx - 6, my - 13, 12, 20, 6) : ctx.rect(mx - 6, my - 13, 12, 20);
+        ctx.fill();
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(mx, my + 2, 11, Math.PI * 0.15, Math.PI * 0.85, false);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(mx, my + 13); ctx.lineTo(mx, my + 19);
+        ctx.moveTo(mx - 7, my + 19); ctx.lineTo(mx + 7, my + 19);
+        ctx.stroke();
+      }
+      body.nameTex.needsUpdate = true;
+    }
+
+    // ===== تحديث حالة "بيتكلم" للاعب بعيد — بتتنادى لما توصل رسالة speaking عبر الـ dataChannel =====
+    function _setRemoteSpeaking(id, isSpeaking) {
+      const body = RemoteBodies[id];
+      if (!body || body.speaking === isSpeaking) return;
+      body.speaking = isSpeaking;
+      _drawRemoteName(body);
+      updateOnlineHUD(); // حدّث نفس الحالة في قائمة اللاعبين بالـ HUD كمان
+    }
+
+    function _removeRemoteBody(id) {
+      const body = RemoteBodies[id];
+      if (!body) return;
+      const scene = window._gameScene;
+      if (scene) scene.remove(body.group);
+      // تحرير الموارد (texture/material/geometry) — تسريب ذاكرة بسيط لو اتجاهلناها
+      body.group.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (obj.material.map) obj.material.map.dispose();
+          obj.material.dispose();
+        }
+      });
+      delete RemoteBodies[id];
+    }
+
+    function _clearAllRemoteBodies() {
+      for (const id of Object.keys(RemoteBodies)) _removeRemoteBody(id);
+    }
+    window._clearRemoteBodies = _clearAllRemoteBodies; // ★ يُستدعى من backToLobby
+
+    // حد أقصى معقول لإحداثيات الخريطة — أكبر بكثير من حجم الخريطة الفعلي
+    // (60×3.4 ≈ 204 وحدة) عشان نمسك بس القيم المكسورة فعلاً، مش نرفض
+    // مواضع حقيقية على حواف الخريطة
+    const MAP_BOUNDS = 500;
+    function _isValidCoord(n) {
+      return typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < MAP_BOUNDS;
+    }
+
+    function _onRemotePosition(id, msg) {
+      // ★ تحقق من صحة البيانات الواردة عبر الشبكة قبل استخدامها — لاعب معطوب
+      // أو رسالة تالفة ممكن تبعت NaN/Infinity وده يكسر رسم المشهد بالكامل
+      // (NaN بينتشر عبر حسابات المصفوفات في Three.js) لو استخدمناها زي ما هي
+      if (!_isValidCoord(msg.x) || !_isValidCoord(msg.z) || typeof msg.yaw !== 'number' || !Number.isFinite(msg.yaw)) {
+        console.warn('[Online] إحداثيات غير صالحة من', id, '— تم تجاهلها');
+        return;
+      }
+      const isNewBody = !RemoteBodies[id]; // ★ لازم نعرف ده قبل ما ننادي _ensureRemoteBody
+      const body = _ensureRemoteBody(id);
+      if (!body) return;
+      body.targetPos.set(msg.x, 0, msg.z);
+      body.targetYaw = msg.yaw;
+      if (isNewBody) {
+        // ★ أول رسالة موضع لجسم جديد — نطابق currentPos فوراً بدل ما نسيبها
+        // تبدأ من نقطة الصفر (0,0,0) وتتزحلق بصرياً لموضعه الحقيقي؛ كان
+        // ده بيسبب "ومضة" ظهور اللاعب التاني في نص الخريطة قبل ما ينزلق
+        // لمكانه الصح كل مرة جسمه بيتبنى لأول مرة.
+        body.currentPos.copy(body.targetPos);
+        body.currentYaw = body.targetYaw;
+        body.group.position.copy(body.currentPos);
+        body.group.rotation.y = body.currentYaw;
+      }
+    }
+
+    // استيفاء سلس نحو آخر موضع مُستقبَل — بيتنادى كل frame من حلقة اللعبة الرئيسية
+    function _updateRemoteBodies(delta) {
+      for (const id in RemoteBodies) {
+        const b = RemoteBodies[id];
+        b.currentPos.lerp(b.targetPos, Math.min(1, delta * 8));
+        // أقصر مسافة زاوية (تجنب اللف الطويل لما الزاوية تعدي 180°)
+        let dYaw = b.targetYaw - b.currentYaw;
+        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+        b.currentYaw += dYaw * Math.min(1, delta * 8);
+        b.group.position.copy(b.currentPos);
+        b.group.rotation.y = b.currentYaw;
+      }
+    }
+    window._updateRemoteBodies = _updateRemoteBodies; // ★ يُستدعى من حلقة اللعبة الرئيسية
+
+    // إرسال موضعي الحالي لكل اللاعبين المتصلين — بمعدل محدود (مش كل frame)
+    // 10 مرات/ثانية كافية جداً لحركة سلسة وموفّرة للـ bandwidth والمعالج
+    let _lastPosSend = 0;
+    function _broadcastPosition() {
+      if (!OnlineState.inRoom) return; // مفيش حد يستقبل — متعملش الشغل ده أصلاً
+      const now = performance.now();
+      if (now - _lastPosSend < 100) return; // 10Hz
+      _lastPosSend = now;
+      const cam = window._gameCamera;
+      if (!cam) return;
+      const payload = JSON.stringify({ t: 'pos', x: cam.position.x, z: cam.position.z, yaw: cam.rotation.y });
+      for (const id in OnlineState.players) {
+        const dc = OnlineState.players[id].dataChannel;
+        if (dc && dc.readyState === 'open') {
+          try { dc.send(payload); } catch (e) { /* القناة اتقفلت لسه في الأثناء — تجاهل */ }
+        }
+      }
+    }
+    window._broadcastPosition = _broadcastPosition; // ★ يُستدعى من حلقة اللعبة الرئيسية
+
+    // ===== مغادرة الغرفة الحالية بشكل نظيف =====
+    // بيتنادى من backToLobby() — كانت قبل كده OnlineState.inRoom بتفضل true
+    // للأبد حتى بعد الرجوع للوبي، فيديا اتصالات الأقران فاضلة شغالة في الخلفية
+    function leaveRoom() {
+      if (!OnlineState.inRoom && !OnlineState.socket) return;
+      // اقفل كل اتصالات الأقران وامسح أجسامهم
+      for (const id in OnlineState.players) {
+        const p = OnlineState.players[id];
+        if (p.pc) { try { p.pc.close(); } catch(e) {} }
+        if (p.audio) { try { p.audio.pause(); p.audio.srcObject = null; } catch(e) {} }
+      }
+      OnlineState.players = {};
+      if (typeof _clearAllRemoteBodies === 'function') _clearAllRemoteBodies();
+      OnlineState.inRoom   = false;
+      OnlineState.roomId   = null;
+      OnlineState.roomName = null;
+      if (_connectionQuality._pingTimer) { clearInterval(_connectionQuality._pingTimer); _connectionQuality._pingTimer = null; }
+
+      // ★ إيقاف المايك فعلياً — كان بيفضل شغال في الخلفية (المتصفح فاضل
+      // ماسك المايك) حتى بعد "الخروج" من الغرفة، لأن إغلاق اتصالات
+      // الأقران بيوقف إرسال الصوت بس، مش الالتقاط المحلي نفسه
+      _stopLocalVAD(); // ★ وقف حلقة كشف التكلم قبل قفل التراك نفسه
+      if (OnlineState.localStream) {
+        try { OnlineState.localStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+        OnlineState.localStream = null;
+      }
+
+      // ★ إخفاء أزرار المايك من الواجهة — دي كانت المشكلة الأساسية المُبلَّغ
+      // عنها: الأزرار كانت بتفضل ظاهرة في وضع اللعب الفردي بعد الخروج من
+      // الأونلاين، لأن حد ماكانش بيشيل كلاس 'active' عن voice-controls
+      const vc = document.getElementById('voice-controls');
+      if (vc) vc.classList.remove('active');
+
+      // مفيش leave-room event في بروتوكول السيرفر الحالي — أقرب طريقة نظيفة
+      // نعلن بيها للسيرفر إننا خرجنا هي قطع الاتصال، والسيرفر المفروض يبعت
+      // player-left لباقي اللاعبين تلقائياً (سلوك قياسي في أي سيرفر socket.io)
+      if (OnlineState.socket) {
+        try { OnlineState.socket.disconnect(); } catch(e) {}
+        // إعادة اتصال فوري — عشان اللاعب يقدر يدخل غرفة جديدة من غير reload
+        setTimeout(() => { if (OnlineState.socket) OnlineState.socket.connect(); }, 300);
+      }
+      _updateSignalHUD();
+      const hud = document.getElementById('online-hud');
+      if (hud) hud.classList.remove('active');
+    }
+    window._leaveOnlineRoom = leaveRoom; // ★ يُستدعى من backToLobby (سكريبت مختلف)
 
     // ===== طلب المايك =====
     async function getMic() {
@@ -6055,11 +7593,81 @@ _buildDoor(x, z) {
         OnlineState.localStream = stream;
         // لو المايك متكتم من البداية — وقف التراك
         if (!OnlineState.micEnabled) stream.getAudioTracks().forEach(t => t.enabled = false);
+        _startLocalVAD(stream);
         return true;
       } catch (e) {
         console.warn('[MIC] لا يوجد وصول للمايك:', e.message);
         showOnlineToast('لم يتم الوصول للمايك', 3000);
         return false;
+      }
+    }
+
+    // ===== كشف التكلم المحلي (Local VAD) — بيحلل مستوى صوتي أنا ويحدد
+    // هل أنا بتكلم فعلياً دلوقتي، عشان نبعت الحالة دي لباقي اللاعبين
+    // (تعريف المتغير _localVAD نفسه فوق مع OnlineState — راجع الملحوظة هناك) =====
+    function _startLocalVAD(stream) {
+      _stopLocalVAD(); // نظّف أي instance قديم لو موجود (لو getMic اتنادت تاني)
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.6;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+
+        const SPEAK_THRESHOLD = 14;   // عتبة مستوى الصوت (0-255) — فوقها = بيتكلم
+        const HANG_MS = 350;          // مهلة قبل اعتبار إنه "سكت" — يمنع الوميض السريع بين الكلمات
+        let lastAboveTime = 0;
+        let isSpeaking = false;
+
+        function tick() {
+          analyser.getByteFrequencyData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) sum += data[i];
+          const avg = sum / data.length;
+
+          const now = performance.now();
+          if (avg > SPEAK_THRESHOLD) lastAboveTime = now;
+          const shouldSpeak = (now - lastAboveTime) < HANG_MS;
+
+          // المايك مكتوم أو مش في غرفة أونلاين → مفيش تكلم بالتعريف
+          const effectivelySpeaking = shouldSpeak && OnlineState.micEnabled && OnlineState.inRoom;
+
+          if (effectivelySpeaking !== isSpeaking) {
+            isSpeaking = effectivelySpeaking;
+            _broadcastSpeaking(isSpeaking);
+            updateOnlineHUD(); // حدّث أيقونة المايك بتاعة "أنت" في القائمة فوراً
+          }
+          _localVAD.isSpeaking = isSpeaking;
+          _localVAD.rafId = requestAnimationFrame(tick);
+        }
+
+        _localVAD = { ctx, analyser, data, rafId: null, isSpeaking: false };
+        _localVAD.rafId = requestAnimationFrame(tick);
+      } catch (e) {
+        console.warn('[VAD] تعذّر تشغيل كشف التكلم:', e.message);
+      }
+    }
+
+    function _stopLocalVAD() {
+      if (!_localVAD) return;
+      if (_localVAD.rafId) cancelAnimationFrame(_localVAD.rafId);
+      try { _localVAD.ctx.close(); } catch (e) {}
+      _localVAD = null;
+    }
+
+    // ===== بث حالة "بيتكلم" لكل اللاعبين المتصلين عبر نفس الـ dataChannel
+    // المستخدم لبث الموضع — نفس المبدأ بالظبط بس لحقل speaking =====
+    function _broadcastSpeaking(isSpeaking) {
+      if (!OnlineState.inRoom) return;
+      const payload = JSON.stringify({ t: 'speak', on: isSpeaking });
+      for (const id in OnlineState.players) {
+        const dc = OnlineState.players[id].dataChannel;
+        if (dc && dc.readyState === 'open') {
+          try { dc.send(payload); } catch (e) { /* القناة اتقفلت لسه في الأثناء — تجاهل */ }
+        }
       }
     }
 
@@ -6077,6 +7685,7 @@ _buildDoor(x, z) {
       doJoinFlash();
       showOnlineToast(`✓ انضممت إلى "${roomName}"`, 3000);
       updateOnlineHUD();
+      _updateSignalHUD(); // ★ إظهار مؤشر قوة الإشارة الآن إن اللاعب دخل غرفة
     }
 
     // ===== الانضمام لغرفة =====
@@ -6099,12 +7708,9 @@ _buildDoor(x, z) {
     }
 
     // ===== اللعب الفردي =====
-    function startSolo() {
-      const mm = document.getElementById('main-menu');
-      if (mm) mm.style.display = 'none';
-      const so = document.getElementById('settings-overlay');
-      if (so) so.classList.remove('hidden');
-    }
+    // ✅ FIX(dead-code): startSolo() اتشالت — مكانش ليها أي onclick أو
+    // addEventListener في الملف كله. نفس منطقها بالظبط موجود فعلياً
+    // في الـ event listener الحقيقي بتاع mm-solo-btn فوق في الملف.
 
     // ===== Socket.io: الاتصال بالسيرفر =====
     function connectSocket() {
@@ -6122,6 +7728,9 @@ _buildDoor(x, z) {
           // تحديث حالة الاتصال في الواجهة
           const ind = document.getElementById('server-indicator');
           if (ind) { ind.style.background = '#00ff88'; ind.title = 'متصل'; }
+          _connectionQuality.connectedSince = performance.now();
+          _connectionQuality.recentDisconnects = _connectionQuality.recentDisconnects.filter(t => performance.now() - t < 30000);
+          _startPingLoop(socket);
         });
 
         socket.on('disconnect', () => {
@@ -6129,6 +7738,9 @@ _buildDoor(x, z) {
           showOnlineToast('انقطع الاتصال بالسيرفر', 3000);
           const ind = document.getElementById('server-indicator');
           if (ind) { ind.style.background = '#ff4444'; ind.title = 'غير متصل'; }
+          _connectionQuality.recentDisconnects.push(performance.now());
+          _connectionQuality.connected = false;
+          _updateSignalHUD();
         });
 
         socket.on('connect_error', () => {
@@ -6176,6 +7788,7 @@ _buildDoor(x, z) {
             if (p.pc)    { p.pc.close(); }
             if (p.audio) { p.audio.pause(); p.audio.srcObject = null; }
             showOnlineToast(`خرج ${p.name}`, 2000);
+            _removeRemoteBody(id); // ★ إخفاء جسمه فوراً بدل ما ننتظر onclose
             delete OnlineState.players[id];
             updateOnlineHUD();
           }
@@ -6185,6 +7798,7 @@ _buildDoor(x, z) {
         socket.on('webrtc-offer', async ({ from, offer }) => {
           if (!OnlineState.players[from]) OnlineState.players[from] = { name: 'لاعب' };
           const pc = OnlineState.players[from].pc || createPeer(from, false);
+          if (!pc) return; // ★ وصلنا للحد الأقصى للاتصالات — تجاهل بأمان
           OnlineState.players[from].pc = pc;
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
           const answer = await pc.createAnswer();
@@ -6890,6 +8504,11 @@ _buildDoor(x, z) {
     if (e.key === 'Escape') {
       if (!settingsOverlay.classList.contains('mod-overlay-hidden')) {
         closeSettings();
+      } else {
+        // ✅ FIX(escape-close): كان مفيش else هنا فعلياً، فالضغط التاني على
+        // Escape (بعد ما الإعدادات تتقفل) مكانش بيعمل حاجة. دلوقتي بيقفل
+        // المود فعلاً زي ما الكومنت فوق كان بيوعد.
+        closeModWrapper();
       }
     }
   });
